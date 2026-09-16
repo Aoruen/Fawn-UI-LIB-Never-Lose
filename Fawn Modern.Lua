@@ -1,7 +1,7 @@
 local Fawn={
-    Version="9.8.0-serotonin",
+    Version="9.8.1-serotonin",
     APIRevision=37,
-    BuildId="fawnui-serotonin-9.8.0-single-shell-materials-motion-20260916",
+    BuildId="fawnui-serotonin-9.8.1-pixel-polish-glass-wrap-20260916",
     ProductName="Fawn Neverlose UI",
     Nickname="Fawn Modern",
     IsFawnLibrary=true,
@@ -6235,9 +6235,9 @@ local function surfaceAlpha(w,role,base,explicit)
     local over=w.surfaceAlphaOverrides and w.surfaceAlphaOverrides[role]
     if over~=nil then local n=tonumber(over)or 255;if n<=1 then n=n*255 end;return clamp(n,0,255)end
     local p=surfacePreset(w);local op=clamp(tonumber(w.glassOpacity)or p.opacity,.18,1)
-    local root=118+op*137+p.bias
-    local add={main=0,sidebar=7,card=10,control=22,popup=28,overlay=20}
-    return clamp(root+(add[role]or 0),70,252)
+    local root=90+op*155+p.bias
+    local add={main=0,sidebar=0,card=11,control=24,popup=30,overlay=22}
+    return clamp(root+(add[role]or 0),64,246)
 end
 
 local oldCreateWindow=Fawn.CreateWindow
@@ -6294,19 +6294,27 @@ function Window:_fill(role,x,y,w,h,key,r,a)
     c=animColor(self,id,c)
     local rr=max(0,(tonumber(r)or 0)*(self.radiusScale or 1))
     rect(x,y,w,h,c,rr,c[4])
-    if self.liquidGlass and self.surfaceHighlights and w>16 and h>8 then
-        local p=surfacePreset(self);local ha=p.highlight or 0
-        if ha>0 and(role=="card"or role=="popup"or role=="sidebar")then local inset=min(max(4,rr*.55),w*.18);line(x+inset,y+1,x+w-inset,y+1,self:_color("white"),max(1,self.scale*.7),ha)end
+    if self.liquidGlass and self.surfaceHighlights and w>28 and h>12 then
+        local p=surfacePreset(self);local ha=min(9,p.highlight or 0)
+        if ha>0 and(role=="card"or role=="popup"or role=="overlay")then
+            local ss=self.scale or 1;local inset=min(max(7*ss,rr*.65),w*.20)
+            line(x+inset,y+2*ss,x+w-inset,y+2*ss,self:_color("white"),max(.75,ss*.65),ha)
+        end
     end
 end
 local oldOut=Window._out
 function Window:_out(x,y,w,h,r,t,c,a)
     polishDefaults(self,{})
-    local rr=max(0,(tonumber(r)or 0)*(self.radiusScale or 1));local aa=a
-    if aa~=nil then aa=clamp((tonumber(aa)or 255)*(self.outlineOpacity or 1),0,255)
-    elseif(self.outlineOpacity or 1)<.999 then aa=255*(self.outlineOpacity or 1)end
-    if self.liquidGlass and aa==nil then aa=clamp(200*(self.outlineOpacity or 1),40,220)end
-    return oldOut(self,x,y,w,h,rr,t,c,aa)
+    local rr=max(0,(tonumber(r)or 0)*(self.radiusScale or 1))
+    local oc=rgba(c or self.outlineColor or self:_color("outline"))
+    if self.liquidGlass then
+        local bg=surfaceColor(self,"main",self:_color("menuBg"))
+        oc=blend(bg,oc,.72)
+    end
+    local aa=a~=nil and clamp(tonumber(a)or 255,0,255)or(self.liquidGlass and 168 or 255)
+    aa=clamp(aa*(self.outlineOpacity or 1),0,255)
+    local th=max(.75,(tonumber(t)or self.borderThickness or 1)*(self.outlineStrength or 1))
+    safe("Rect",floor(x),floor(y),max(1,floor(w+.5)),max(1,floor(h+.5)),rgb(oc),th,rr,aa)
 end
 
 function Window:_drawToggle(x,cy,on,disabled)
@@ -6322,21 +6330,86 @@ function Window:_drawToggle(x,cy,on,disabled)
     return xx,cy-h*.5,w,h
 end
 
-local oldSidebar=Window._drawSidebar
+function Window:_drawLogo()
+    local s=self.scale;local X,Y=self.x,self.y
+    local lx,ly=X+25*s,Y+20*s
+    self:_fill("control",lx,ly,50*s,50*s,"logoBg",12*s,255)
+    if self.logoImage then drawImage(self.logoImage,lx+5*s,ly+5*s,40*s,40*s,1)else
+        local lw,lh=measure(self.logo,24*s,"Verdana");text(self.logo,lx+25*s-lw*.5,ly+25*s-lh*.5,self:_color("logoFg"),24*s,"Verdana")
+    end
+    local tx=X+98*s;local maxW=max(38*s,(REF.Sidebar-118)*s)
+    textC(fit(self.brand,maxW,22*s,"Verdana"),tx,Y+33*s,self:_color("white"),22*s,"Verdana")
+    local lines=wrapText(self.subtitle,maxW,11*s,"Verdana",2)
+    if #lines==0 then lines={""}end
+    local baseY=Y+50*s;local step=12*s
+    for i,v in ipairs(lines)do textC(v,tx,baseY+(i-1)*step,self:_color("muted"),11*s,"Verdana")end
+end
+
 function Window:_drawSidebar()
     polishDefaults(self,{})
-    oldSidebar(self)
     if self.kind=="Panel"or self.tabBarVisible==false then return end
-    local s=self.scale;local X,Y=self.x,self.y;local sw=(REF.Sidebar or 275)*s;local H=self.height*s;local r=min(max(2,(self.corner or 22)*s),28*s)
-    if self.sidebarStitch~=false then
-        self:_fill("sidebar",X+sw-r,Y,r+1,r+1,"menuBg",0)
-        self:_fill("sidebar",X+sw-r,Y+H-r-1,r+1,r+1,"menuBg",0)
-        line(X+sw-1*s,Y+1*s,X+sw-1*s,Y+H-1*s,self:_color("line"),max(1,s),55)
+    local s=self.scale;local X,Y=self.x,self.y;local sidebarW=REF.Sidebar*s;local H=self.height*s
+    -- The outer Window is the only shell surface. Do not repaint the sidebar on top of
+    -- translucent main glass; that caused doubled opacity, dirty corners and the broken footer.
+    if self.surfaceAlphaOverrides and self.surfaceAlphaOverrides.sidebar~=nil then
+        local c=surfaceColor(self,"sidebar",self:_color("menuBg"));local aa=surfaceAlpha(self,"sidebar",c[4]or 255,nil)
+        rect(X+1*s,Y+1*s,sidebarW-2*s,H-2*s,c,0,min(55,aa))
     end
-    if self.profileDivider=="Connected"then
-        local py=Y+(self.height-70)*s
-        line(X+1*s,py-15*s,X+sw-1*s,py-15*s,self:_color("line"),max(1,s),72)
+    self:_drawLogo()
+    local divider=blend(surfaceColor(self,"main",self:_color("menuBg")),rgba(self:_color("outline")),self.liquidGlass and .62 or .76)
+    local divA=self.liquidGlass and 118 or 92
+    if self.sidebarStitch~=false then line(X+sidebarW,Y+1*s,X+sidebarW,Y+H-1*s,divider,max(.8,s),divA*(self.outlineOpacity or 1))end
+    line(X+15*s,Y+91*s,X+sidebarW-12*s,Y+91*s,divider,max(.8,s),62*(self.outlineOpacity or 1))
+
+    local groups,order={},{}
+    for _,t in ipairs(self:_visibleTabs())do local g=t.group or"MAIN";if not groups[g]then groups[g]={};order[#order+1]=g end;groups[g][#groups[g]+1]=t end
+    local navTop,profileY=self:_sidebarGeometry();local available=max(80*s,profileY-navTop-18*s);local contentH=0
+    for _,g in ipairs(order)do contentH=contentH+26*s+#groups[g]*60*s+29*s end
+    local maxScroll=max(0,contentH-available);self.sidebarTarget=clamp(self.sidebarTarget or 0,0,maxScroll)
+    if self:_hit(X,navTop,sidebarW,available)and Input.wheel~=0 and not self:_hasPopup()then self.sidebarTarget=clamp(self.sidebarTarget+Input.wheel*60*s,0,maxScroll)end
+    if self._sidebarDrag then
+        if Input.left and maxScroll>0 then local rr=snapRatio96((Input.my-self._sidebarDrag.top-self._sidebarDrag.off)/max(1,self._sidebarDrag.span));self.sidebarTarget=rr*maxScroll;self.sidebarScroll=self.sidebarTarget else self._sidebarDrag=nil end
     end
+    self.sidebarScroll,self.sidebarTarget=settle96(self.sidebarScroll,self.sidebarTarget,maxScroll,self.scrollSpeed,s,self._sidebarDrag~=nil or self.smoothScroll==false)
+    local y=navTop-(self.sidebarScroll or 0)
+    for _,g in ipairs(order)do
+        if y>=navTop and y+20*s<=navTop+available then textC(upper(g),X+33*s,y+7*s,self:_color("muted"),14*s,"Verdana")end
+        y=y+26*s
+        for _,tab in ipairs(groups[g])do
+            local ix,iy,iw,ih=X+17*s,y,241*s,55*s;local visible=iy>=navTop and iy+ih<=navTop+available
+            if visible then
+                local active=tab==self.activeTab;local hov=self:_hit(ix,iy,iw,ih)and not self:_hasPopup()
+                if active then self:_fill("control",ix,iy,iw,ih,"activeItem",12*s)elseif hov then rect(ix,iy,iw,ih,self:_color("white"),12*s,10)end
+                self:_icon(iconForTab(tab),X+43*s,iy+27.5*s,22*s,active and"accent"or"icon")
+                textC(fit(tab.name,168*s,20*s,"Verdana"),X+72*s,iy+27.5*s,self:_color(active and"white"or"navText"),20*s,"Verdana")
+                if Input.click and not self._consumed and not self:_hasPopup()and hov then self:SelectTab(tab);self:_consume()end
+            end
+            y=y+60*s
+        end
+        y=y+29*s
+    end
+    if maxScroll>0 then
+        local tx=X+263*s;local th=available;local thumb=max(32*s,th*(available/contentH));local span=max(1,th-thumb);local ty=navTop+span*((self.sidebarScroll or 0)/maxScroll)
+        local trackHover=self:_hit(tx-7*s,navTop,15*s,th);local thumbHover=self:_hit(tx-7*s,ty-3*s,15*s,thumb+6*s);local active=self._sidebarDrag~=nil
+        if trackHover or active then rect(tx-1*s,navTop,2*s,th,self:_color("controlHover"),1*s,92)end
+        rect(tx-((active or thumbHover)and 1.5*s or 1*s),ty,(active or thumbHover)and 5*s or 4*s,thumb,self:_color((active or thumbHover)and"accent"or"outline"),2*s,(active or thumbHover)and 245 or 175)
+        if Input.click and not self._consumed and not self:_hasPopup()and thumbHover then self._sidebarDrag={top=navTop,span=span,off=Input.my-ty};self:_consume()end
+    else self._sidebarDrag=nil end
+
+    -- Footer/profile is drawn directly on the single shell. No opaque cleanup rectangle.
+    local fy=profileY-15*s
+    if self.profileDivider=="Inset"then line(X+15*s,fy,X+sidebarW-15*s,fy,divider,max(.8,s),72*(self.outlineOpacity or 1))
+    else line(X+15*s,fy,X+sidebarW-1*s,fy,divider,max(.8,s),72*(self.outlineOpacity or 1))end
+    local ux,uy,uw,uh=X+15*s,profileY,245*s,55*s
+    local phov=self:_hit(ux,uy,uw,uh)and not(self.openDrop or self.keyMenu or self.colorPopup or self.configPopup or self.groupPopup)
+    if phov or self.accountOpen then self:_fill("control",ux,uy,uw,uh,"activeItem",12*s)end
+    if self.profileImage then self:_fill("control",ux+8*s,uy+8*s,39*s,39*s,"control",19.5*s);drawImage(self.profileImage,ux+8*s,uy+8*s,39*s,39*s,1)
+    else circle(ux+27.5*s,uy+27.5*s,19.5*s,self:_color("avatar"),255);circle(ux+27.5*s,uy+22*s,6.5*s,self:_color("avatarDark"),255);safe("Rect",floor(ux+17*s),floor(uy+31*s),max(1,floor(21*s+.5)),max(1,floor(11*s+.5)),rgb(self:_color("avatarDark")),2*s,6*s,255)end
+    textC(fit(self.profileName,139*s,16*s,"Verdana"),ux+58*s,uy+21*s,self:_color("text"),16*s,"Verdana")
+    textC(fit(self.profileSubtitle,139*s,12*s,"Verdana"),ux+58*s,uy+39*s,self:_color("muted"),12*s,"Verdana")
+    local target=self.accountOpen and 90 or 0;if self.animations then self.accountAnim=self.accountAnim+(target-self.accountAnim)*min(1,dt()*self.animationSpeed)else self.accountAnim=target end
+    chev(self,ux+222*s,uy+27.5*s,16*s,self:_color("muted"),self.accountAnim)
+    if Input.click and not self._consumed and phov and not(self.openDrop or self.keyMenu or self.colorPopup or self.configPopup or self.groupPopup)then if type(self.profileClick)=="function"then pcall(self.profileClick,self)else self.accountOpen=not self.accountOpen end;self:_consume()end
 end
 
 if Overlay and type(Overlay._frame)=="function"then
@@ -6345,8 +6418,8 @@ if Overlay and type(Overlay._frame)=="function"then
         local win=self.window
         if not win or not win._polish98Init then return oldOverlayFrame(self,x,y,w,h,header)end
         local s=win.scale or 1;local c=surfaceColor(win,"overlay",self:_theme("popup"));local a=surfaceAlpha(win,"overlay",c[4]or 255,nil);rect(x,y,w,h,c,10*s*(win.radiusScale or 1),a)
-        local oc=win.outlineColor or self:_theme("outline");safe("Rect",floor(x),floor(y),max(1,floor(w+.5)),max(1,floor(h+.5)),rgb(oc),max(.8,s*(win.outlineStrength or 1)),10*s*(win.radiusScale or 1),clamp(170*(win.outlineOpacity or 1),0,255))
-        if header then line(x,y+header,x+w,y+header,self:_theme("line"),1,42)end
+        win:_out(x,y,w,h,10*s,max(.8,s),win.outlineColor or self:_theme("outline"),170)
+        if header then local hc=blend(surfaceColor(win,"main",win:_color("menuBg")),rgba(self:_theme("outline")),.62);line(x+1*s,y+header,x+w-1*s,y+header,hc,max(.75,s*.7),48*(win.outlineOpacity or 1))end
     end
 end
 
@@ -6446,16 +6519,20 @@ Fawn.Style.SingleShell=true
 Fawn.Style.ConnectedProfileDivider=true
 Fawn.Style.SurfaceMaterials=copy(SURFACE_NAMES)
 Fawn.Style.MotionStyles=copy(MOTION_NAMES)
-Fawn.PolishVersion="9.8-finishing"
-Fawn.PolishBuildId="fawnui-polish-9.8-single-shell-frosted-motion-20260916"
-Fawn.Version="9.8.0-serotonin"
+Fawn.PolishVersion="9.8.1-pixel-polish"
+Fawn.PolishBuildId="fawnui-polish-9.8.1-single-shell-footer-wrap-outline-20260916"
+Fawn.Version="9.8.1-serotonin"
 Fawn.APIRevision=37
-Fawn.BuildId="fawnui-serotonin-9.8.0-single-shell-materials-motion-20260916"
+Fawn.BuildId="fawnui-serotonin-9.8.1-pixel-polish-glass-wrap-20260916"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.SurfaceMaterials=true
 Fawn.DynamicCapabilities.MotionStyles=true
 Fawn.DynamicCapabilities.GlassTint=true
 Fawn.DynamicCapabilities.SingleShell=true
+Fawn.DynamicCapabilities.PixelPolishedSidebar=true
+Fawn.DynamicCapabilities.WrappedBrandSubtitle=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.PixelPolish98="single shell sidebar + glass-safe profile footer + wrapped brand subtitle + single-pass outlines"
 Fawn.__Polish98=true
 end)(Fawn)
 
