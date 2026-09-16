@@ -1,13 +1,13 @@
 local Fawn={
     Version="9.8.3-serotonin",
     APIRevision=39,
-    BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916",
+    BuildId="fawn-modern-9.8.3-api39-hotfix3-controls-solid-demo-20260916",
     ProductName="Fawn Modern",
     DisplayName="Fawn Modern 9.8.3",
     IsFawnLibrary=true,
     IsModular=true,
     Namespace="FawnModern",
-    ReleaseStamp="983-api39-hotfix1"
+    ReleaseStamp="983-api39-hotfix3-controls-solid-demo"
 }
 
 if type(draw)~="table" or type(Color3)~="table" then error("Fawn Modern: Serotonin draw and Color3 APIs are required") end
@@ -6524,7 +6524,7 @@ Fawn.PolishVersion="9.8.3-complete-customization"
 Fawn.PolishBuildId="fawnui-polish-9.8.3-complete-customization-20260916"
 Fawn.Version="9.8.3-serotonin"
 Fawn.APIRevision=39
-Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916"
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix3-controls-solid-demo-20260916"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.SurfaceMaterials=true
 Fawn.DynamicCapabilities.MotionStyles=true
@@ -6545,10 +6545,10 @@ local Window=Fawn.Classes.Window
 local Overlay=Fawn.Classes.Overlay
 local ESPPreview=Fawn.Classes.ESPPreview
 local Notification=Fawn.Classes.Notification
-local ROOT="C:/Serotonin/files/Fawn Modern"
-local RELROOT="Fawn Modern"
-local PATHS={Root=ROOT,Configs=ROOT.."/configs",ProfilePictures=ROOT.."/Profile Pictures",LogoPictures=ROOT.."/Logo Pictures"}
-local REL={Configs=RELROOT.."/configs",ProfilePictures=RELROOT.."/Profile Pictures",LogoPictures=RELROOT.."/Logo Pictures"}
+local ROOT="Fawn Modern"
+local RELROOT=ROOT
+local PATHS={Root=ROOT,Configs=ROOT.."/configs",ProfilePictures=ROOT.."/Profile Pictures",LogoPictures=ROOT.."/logo pictures"}
+local REL={Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}
 local SECONDARY={Padding=12,Radius=10,RowGap=6,HeaderInset=12,AccentInset=9}
 local function cpy982(v,seen)
     if type(v)~="table"then return v end
@@ -6904,7 +6904,7 @@ function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
     if sec._scrollDrag then if Input.left and sec.maxScroll>0 then local rr=snapRatio96((Input.my-sec._scrollDrag.top-sec._scrollDrag.off)/max(1,sec._scrollDrag.span));sec.scrollTarget=rr*sec.maxScroll;sec.scroll=sec.scrollTarget else sec._scrollDrag=nil;sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)end else sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)end
     local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5);self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
     local rows={}for c,r in pairs(box.layouts)do rows[#rows+1]={c=c,r=r}end;sort(rows,function(a,b)if a.r.y==b.r.y then return a.r.x<b.r.x end return a.r.y<b.r.y end);local offset=sec.scroll or 0
-    for _,q in ipairs(rows)do local r={x=q.r.x,y=q.r.y-offset,w=q.r.w,h=q.r.h};if r.y>=clipT+.25 and r.y+r.h<=clipB-.25 and r.x>=clipL+.25 and r.x+r.w<=clipR-.25 then self:_drawControl(q.c,r,clipT,clipB)end end
+    for _,q in ipairs(rows)do local r={x=q.r.x,y=q.r.y-offset,w=q.r.w,h=q.r.h};if r.y>=clipT-.25 and r.y+r.h<=clipB+.25 and r.x>=clipL-.25 and r.x+r.w<=clipR+.25 then self:_drawControl(q.c,r,clipT,clipB)end end
     if sec.columnDividers==true and sec.columns and sec.columns>1 then local gap=(sec.controlGap or 12)*s;local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s);local cw=(usable-gap*(sec.columns-1))/sec.columns;for i=1,sec.columns-1 do local x=box.x+i*cw+(i-.5)*gap;local y1=max(clipT+8*s,cardTop+8*s);local y2=min(clipB-8*s,cardBottom-8*s);if y2>y1 then line(x,y1,x,y2,self:_color("line"),1,14)end end end
     if sec.maxScroll>1 then
         local gutter=REF.SectionScrollbarGutter*s;local gx=box.x+box.w-gutter;local tx=gx+gutter*.5;local top=clipT+9*s;local bh=max(1,clipB-clipT-18*s);local thumb=max(28*s,bh*(box.cardH/max(box.cardH,box.contentH)));local span=max(1,bh-thumb);local ratio=sec.maxScroll>0 and snapRatio96((sec.scroll or 0)/sec.maxScroll)or 0;local ty=top+span*ratio;local trackHover=self:_hit(gx,clipT,gutter,clipB-clipT);local thumbHover=self:_hit(gx,ty-3*s,gutter,thumb+6*s);local active=sec._scrollDrag~=nil
@@ -6975,7 +6975,7 @@ end
 
 Fawn.Version="9.8.3-serotonin"
 Fawn.APIRevision=39
-Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916"
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix3-controls-solid-demo-20260916"
 Fawn.PolishVersion="9.8.3-complete-customization"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.ProfileMenuAuthoring=true
@@ -6989,7 +6989,7 @@ Fawn.Runtime=Fawn.Runtime or{}
 Fawn.Runtime.StorageRoot=ROOT
 Fawn.Runtime.ProfileMenu="fully authored built-ins/custom rows/separators + dynamic sizing/scroll"
 Fawn.Runtime.SecondaryUI="uniform popup/overlay padding, inset dividers and rounded notification accents"
-Fawn.Runtime.ContainerCorners="rounded visible slices + no translucent scrollbar gutter overdraw"
+Fawn.Runtime.ContainerCorners="rounded visible slices + corrected row boundary clipping + no translucent scrollbar gutter overdraw"
 Fawn.Runtime.ESPElementDrag="expanded hit targets + drag capture wins over frame drag"
 end
 __fawn_apply_982(Fawn)
@@ -7151,7 +7151,7 @@ end
 
 Fawn.Version="9.8.3-serotonin"
 Fawn.APIRevision=39
-Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916"
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix3-controls-solid-demo-20260916"
 Fawn.PolishVersion="9.8.3-complete-customization"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.PresetSettingsMenu=true
@@ -7165,9 +7165,101 @@ Fawn.Runtime.PresetSettings="Window:AddPresetSettingsMenu / presetSettings windo
 Fawn.ProductName="Fawn Modern"
 Fawn.DisplayName="Fawn Modern 9.8.3"
 Fawn.Namespace="FawnModern"
-Fawn.ReleaseStamp="983-api39-hotfix1"
+Fawn.ReleaseStamp="983-api39-hotfix3-controls-solid-demo"
 end
 __fawn_apply_983(Fawn)
+end
+
+
+-- HOTFIX3: restore Section control rendering while preserving rounded visible slices.
+-- The previous strict fully-contained-row gate could reject controls on scaled/fractional layouts.
+do
+local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
+function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
+    local sec=box.section
+    local s=self.scale
+    local cardTop=box.cardY
+    local cardBottom=cardTop+box.cardH
+    local clipL=max(bodyLeft or box.x,box.x)
+    local clipR=min(bodyRight or(box.x+box.w),box.x+box.w)
+    local clipT=max(bodyTop,cardTop)
+    local clipB=min(bodyBottom,cardBottom)
+    if clipB<=clipT or clipR<=clipL then return end
+
+    if sec._scrollDrag then
+        if Input.left and sec.maxScroll>0 then
+            local rr=snapRatio96((Input.my-sec._scrollDrag.top-sec._scrollDrag.off)/max(1,sec._scrollDrag.span))
+            sec.scrollTarget=rr*sec.maxScroll
+            sec.scroll=sec.scrollTarget
+        else
+            sec._scrollDrag=nil
+            sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)
+        end
+    else
+        sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)
+    end
+
+    local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5)
+    self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
+
+    local rows={}
+    for c,r in pairs(box.layouts or{})do rows[#rows+1]={c=c,r=r}end
+    sort(rows,function(a,b)if a.r.y==b.r.y then return a.r.x<b.r.x end return a.r.y<b.r.y end)
+
+    local offset=sec.scroll or 0
+    for _,q in ipairs(rows)do
+        local r={x=q.r.x,y=q.r.y-offset,w=q.r.w,h=q.r.h}
+        self:_drawControl(q.c,r,clipT,clipB)
+    end
+
+    if sec.columnDividers==true and sec.columns and sec.columns>1 then
+        local gap=(sec.controlGap or 12)*s
+        local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s)
+        local cw=(usable-gap*(sec.columns-1))/sec.columns
+        for i=1,sec.columns-1 do
+            local x=box.x+i*cw+(i-.5)*gap
+            local y1=max(clipT+8*s,cardTop+8*s)
+            local y2=min(clipB-8*s,cardBottom-8*s)
+            if y2>y1 then line(x,y1,x,y2,self:_color("line"),1,14)end
+        end
+    end
+
+    if sec.maxScroll>1 then
+        local gutter=REF.SectionScrollbarGutter*s
+        local gx=box.x+box.w-gutter
+        local tx=gx+gutter*.5
+        local top=clipT+9*s
+        local bh=max(1,clipB-clipT-18*s)
+        local thumb=max(28*s,bh*(box.cardH/max(box.cardH,box.contentH)))
+        local span=max(1,bh-thumb)
+        local ratio=sec.maxScroll>0 and snapRatio96((sec.scroll or 0)/sec.maxScroll)or 0
+        local ty=top+span*ratio
+        local thumbHover=self:_hit(gx,ty-3*s,gutter,thumb+6*s)
+        local trackHover=self:_hit(gx,clipT,gutter,clipB-clipT)
+        local active=sec._scrollDrag~=nil
+        if trackHover or active then rect(tx-1*s,top,2*s,bh,self:_color("controlHover"),1*s,88)end
+        rect(tx-((active or thumbHover)and 2*s or 1.5*s),ty,(active or thumbHover)and 4*s or 3*s,thumb,self:_color((active or thumbHover)and"accent"or"outline"),2*s,(active or thumbHover)and 255 or 180)
+        if Input.click and not self._consumed and not self:_hasPopup()and thumbHover then
+            sec._scrollDrag={top=top,span=span,off=Input.my-ty}
+            self:_consume()
+        end
+    else
+        sec._scrollDrag=nil
+        sec.scroll,sec.scrollTarget=0,0
+    end
+
+    self:_out(clipL,clipT,clipR-clipL,clipB-clipT,rr,.82,self:_color("outline"),112)
+
+    local titleY=box.y+7*s
+    if titleY>=bodyTop-20*s and titleY<=bodyBottom then
+        textC(fit(upper(sec.name),max(20,box.w-44*s),14*s,"Verdana"),box.x+22*s,titleY,self:_color("muted"),14*s,"Verdana")
+    end
+end
+
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix3-controls-solid-demo-20260916"
+Fawn.ReleaseStamp="983-api39-hotfix3-controls-solid-demo"
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.SectionControlHotfix="rows always reach _drawControl; rounded visible card slice + final outline"
 end
 
 return Fawn
