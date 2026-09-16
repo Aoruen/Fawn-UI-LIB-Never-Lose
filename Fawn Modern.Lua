@@ -1,17 +1,18 @@
 local Fawn={
     Version="9.8.3-serotonin",
     APIRevision=39,
-    BuildId="fawnui-serotonin-9.8.3-preset-settings-managed-storage-20260916",
-    ProductName="Fawn Neverlose UI",
-    Nickname="Fawn Modern",
+    BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916",
+    ProductName="Fawn Modern",
+    DisplayName="Fawn Modern 9.8.3",
     IsFawnLibrary=true,
     IsModular=true,
-    Namespace="FawnNeverloseUI"
+    Namespace="FawnModern",
+    ReleaseStamp="983-api39-hotfix1"
 }
 
-if type(draw)~="table" or type(Color3)~="table" then error("Fawn Neverlose UI: Serotonin draw and Color3 APIs are required") end
-if type(utility)~="table" or type(mouse)~="table" or type(keyboard)~="table" then error("Fawn Neverlose UI: Serotonin utility, mouse and keyboard APIs are required") end
-if type(cheat)~="table" or type(cheat.Register)~="function" then error("Fawn Neverlose UI: cheat.Register is required") end
+if type(draw)~="table" or type(Color3)~="table" then error("Fawn Modern: Serotonin draw and Color3 APIs are required") end
+if type(utility)~="table" or type(mouse)~="table" or type(keyboard)~="table" then error("Fawn Modern: Serotonin utility, mouse and keyboard APIs are required") end
+if type(cheat)~="table" or type(cheat.Register)~="function" then error("Fawn Modern: cheat.Register is required") end
 
 local floor,ceil,abs,min,max,sin,cos,pi=math.floor,math.ceil,math.abs,math.min,math.max,math.sin,math.cos,math.pi
 local insert,remove,concat,sort=table.insert,table.remove,table.concat,table.sort
@@ -995,7 +996,7 @@ if themeName=="Neverlose"or themeName=="Fawn"then themeName="Modern Blue"end
         scale=clamp(tonumber(opt.scale)or 1,.55,1.65),visible=opt.visible~=false,destroyed=false,columns=clamp(floor(tonumber(opt.columns)or 2),1,4),tabs={},flags={},activeTab=nil,
         themeName=themeName,theme=copy(PRESETS[themeName]or PRESETS["Modern Blue"]),independentTheme=opt.independentTheme==true,font="Verdana",corner=tonumber(opt.corner)or 22,borderThickness=max(1,tonumber(opt.borderThick or opt.borderThickness)or 1),
         toggleKey=opt.toggleKey or"Insert",toggleLabel=opt.toggleLabel or"INSERT",toggleControl=nil,followMenu=opt.followMenu==true,mainScrollEnabled=opt.mainScrollEnabled~=false,smoothScroll=opt.smoothScroll~=false,scrollSpeed=tonumber(opt.scrollSpeed)or 12,
-        liquidGlass=opt.liquidGlass==true,glassOpacity=clamp(tonumber(opt.glassOpacity)or .72,.18,1),animations=opt.animations~=false,animationSpeed=tonumber(opt.animationSpeed)or 10,accentGlow=opt.accentGlow==true,compact=opt.compact==true,layoutMode=opt.layoutMode or"Neverlose",
+        liquidGlass=opt.liquidGlass==true,glassOpacity=clamp(tonumber(opt.glassOpacity)or .72,.18,1),animations=opt.animations~=false,animationSpeed=tonumber(opt.animationSpeed)or 10,accentGlow=opt.accentGlow==true,compact=opt.compact==true,layoutMode=opt.layoutMode or"Modern",
         tabBarVisible=opt.tabBar~=false,backgroundBlur=opt.backgroundBlur==true,backgroundSnow=opt.backgroundSnow==true,
         draggable=opt.draggable~=false,resizable=opt.resizable~=false,dragging=nil,resizing=nil,sidebarScroll=0,sidebarTarget=0,inputEdit=nil,captureBind=nil,activeSlider=nil,openDrop=nil,keyMenu=nil,colorPopup=nil,configPopup=nil,groupPopup=nil,accountOpen=false,accountAnim=0,searchOpen=false,search="",searchEdit=nil,
         profileName=tostring(opt.user or opt.profileName or"User"),profileSubtitle=tostring(opt.userSub or opt.profileSubtitle or""),profileImage=nil,profileImagePath=nil,profileClick=nil,
@@ -1078,7 +1079,7 @@ function Window:SetAccentGlow(v)self.accentGlow=v==true
 return self end
 function Window:SetCompact(v)self.compact=v==true
 return self end
-function Window:SetLayoutMode(v)self.layoutMode=tostring(v or"Neverlose")
+function Window:SetLayoutMode(v)self.layoutMode=tostring(v or"Modern")
 return self end
 function Window:SetBackgroundBlur(v)self.backgroundBlur=v==true
 return self end
@@ -3085,7 +3086,7 @@ Fawn.StatusBar=Fawn.CreateStatusBar
 -- Settings page
 local SettingsPage={}
 SettingsPage.__index=SettingsPage
-local function settingsPath(path)return "C:/Serotonin/files/"..tostring(path or"FawnNeverlose/config.lua")end
+local function settingsPath(path)return "C:/Serotonin/files/"..tostring(path or"Fawn Modern/configs/default.lua")end
 local function serialize(v,seen)
     local t=type(v)
 if t=="nil"then return"nil"elseif t=="boolean"or t=="number"then return tostring(v)elseif t=="string"then return format("%q",v)elseif t~="table"then return"nil"end
@@ -3098,7 +3099,7 @@ out[#out+1]="}"
 seen[v]=nil
 return concat(out)
 end
-function SettingsPage:SetConfigPath(p)self.ConfigPath=tostring(p or"FawnNeverlose/config.lua")
+function SettingsPage:SetConfigPath(p)self.ConfigPath=tostring(p or"Fawn Modern/configs/default.lua")
 return self end
 function SettingsPage:GetConfigPath()return self.ConfigPath end
 function SettingsPage:CaptureDefaults()self.Defaults=self.Window:GetConfig()
@@ -3141,7 +3142,7 @@ function Fawn:CreateSettingsPage(window,opt)
     if kind(window)~="Window"and kind(window)~="Panel"then error("CreateSettingsPage requires a Fawn Window")end
     if window.settingsPage then return window.settingsPage end
     opt=type(opt)=="table"and opt or{}
-    local page=setmetatable({Window=window,Controls={},ConfigPath=tostring(opt.configPath or"FawnNeverlose/config.lua"),Defaults=nil},SettingsPage)
+    local page=setmetatable({Window=window,Controls={},ConfigPath=tostring(opt.configPath or"Fawn Modern/configs/default.lua"),Defaults=nil},SettingsPage)
     local tab=window:Tab(opt.title or"Settings",{group=opt.group or"MISCELLANEOUS",icon="misc"})
 page.Tab=tab
     local appearance=tab:Section("APPEARANCE",{column=1,row=1,sizeMode="auto"})
@@ -3208,7 +3209,7 @@ return n end,{controlColumn=1})
     diagnostics:AddValue("Window Size",function()local w,h=window:GetSize()
 return round(w).." x "..round(h)end,{controlColumn=2})
     diagnostics:AddValue("Scale",function()return round(window:GetScale()*100).."%"end,{controlColumn=2})
-    diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Neverlose UI is rendering correctly.",{title="DIAGNOSTICS"})end,{controlColumn=2})
+    diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Modern 9.8.3 is rendering correctly.",{title="DIAGNOSTICS"})end,{controlColumn=2})
     page:CaptureDefaults()
 window.settingsPage=page
 return page
@@ -3249,12 +3250,12 @@ function Fawn:WrapText(value,maxWidth,font,maxLines,size)return wrapText(value,m
 function Fawn:GetKind(object)return kind(object)end
 function Fawn:Is(object,k)return kind(object)==k end
 function Fawn:GetDynamicCapabilities()return{dynamicControls=true,dynamicSections=true,dynamicTabs=true,optionMutation=true,optionSources=true,visibilityRules=true,textInput=true,textWrapping=true,nestedScrolling=true,uiScale=true,liquidGlass=true,embeddedESP=true,draggableOverlays=true,namedConfigs=true}end
-function Fawn:AssertCompatible(revision)if tonumber(revision)and tonumber(revision)>self.APIRevision then error("Fawn Neverlose UI API "..tostring(revision).." required; loaded API "..tostring(self.APIRevision))end
+function Fawn:AssertCompatible(revision)if tonumber(revision)and tonumber(revision)>self.APIRevision then error("Fawn Modern API "..tostring(revision).." required; loaded API "..tostring(self.APIRevision))end
 return true end
 
 
 -- ==========================================================================
--- Fawn Neverlose UI 9.1 extended library surface
+-- Fawn Modern compatibility surface (legacy API layer)
 -- Dynamic construction, schema APIs, navigation mutation, metrics, rules,
 -- object events, layout validation, state snapshots, and compatibility aliases.
 -- ==========================================================================
@@ -4661,7 +4662,7 @@ Fawn.globalThemeName="Modern Blue"
 Fawn.globalTheme=copy(PRESETS["Modern Blue"])
 
 
--- 9.2 layout/input/ESP stability pass -------------------------------------------------
+-- Compatibility layer: layout/input/ESP stability -------------------------------------
 Fawn.Runtime=Fawn.Runtime or {}
 Fawn.Style.ContainerClip=true
 Fawn.Style.ReferenceAccessoryPopups=true
@@ -5055,7 +5056,7 @@ Fawn.Runtime.ColorPicker="original Fawn HSV/SV + hue + alpha picker with color c
 Fawn.Runtime.Input="original Fawn caret-aware single-line text input with horizontal text window"
 
 
--- 9.3 final containment / scale / ESP parity layer.
+-- Compatibility layer: containment / scale / ESP parity.
 local function applyScale93(self,newScale)
     local old=self.scale or 1
     newScale=clamp(tonumber(newScale)or old,.55,1.65)
@@ -5238,7 +5239,7 @@ Fawn.Runtime.Scrollbar="accent hover/drag feedback for Section, page and sidebar
 Fawn.Runtime.ESPWidgets="original Fawn cursor-follow drag parity + slot commit + stacking reorder + reset/shuffle"
 
 
--- 9.4 scroll/accessory/layout polish layer.
+-- Compatibility layer: scroll/accessory/layout polish.
 REF.PageScrollbarGutter=12
 REF.SectionScrollbarGutter=12
 REF.AccessoryWidth=318
@@ -5480,7 +5481,7 @@ Fawn.Runtime.ColorPicker="compact Fawn HSV/SV + hue + alpha picker"
 
 
 
--- 9.5 scroll-capture / wrapping / color / caret polish layer.
+-- Compatibility layer: scroll-capture / wrapping / color / caret polish.
 REF.SectionGap=35
 REF.ColorChipFull=34
 REF.ColorChipCompact=30
@@ -5590,7 +5591,7 @@ function Window:_drawColorPopup()
     if p.drag then if Input.left then local h0,s0,v0=rgbToHsv92(arr[1],arr[2],arr[3]);local q=copy(arr);if p.drag=="sv"then s0=clamp((Input.mx-svx)/svw,0,1);v0=1-clamp((Input.my-svy)/svh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)elseif p.drag=="h"then h0=clamp((Input.my-hy)/hh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)else q[4]=round(clamp((Input.mx-ax)/aw,0,1)*255)end;c:Set(q)else p.drag=nil end end
 end
 
--- Stable page/section scrollbars. Explicit numeric geometry avoids the Lua `true` arithmetic crash from 9.4.
+-- Stable page/section scrollbars with explicit numeric geometry.
 local function scrollbarThumb95(win,x,top,height,thumb,ratio,active)
     local s=win.scale;local span=max(1,height-thumb);local y=top+span*clamp(ratio,0,1);local hover=win:_hit(x-7*s,y-4*s,14*s,thumb+8*s);local over=hover or active
     local half=over and 2*s or 1.5*s;local width=over and 4*s or 3*s
@@ -5619,7 +5620,7 @@ Fawn.Runtime.ColorPicker95="smaller chips + compact HSV popup + inset outlines"
 Fawn.Runtime.CaretScale="cursor-centric input viewport + editor geometry reset on scale reflow"
 
 
--- 9.6 input ownership / endpoint scroll stability / outline finalization layer.
+-- Compatibility layer: input ownership / endpoint scrolling / outline finalization.
 Fawn.Rules.PopupInputIsModal=true
 Fawn.Rules.FrontOverlayOwnsInputBeforeWindow=true
 Fawn.Rules.ScrollEndpointsSnap=true
@@ -5803,7 +5804,7 @@ Fawn.Runtime.ClickThrough96="dropdown/accessory/color/config/group/account popup
 Fawn.Runtime.Outline96="Section and overlay outlines are inset and drawn after internal fills/scrollbars"
 Fawn.Runtime.RowHotspot96="plain text/value/label rows have no full-row hover or click hotspot"
 
--- 9.7 original-Fawn hotkey / modal pointer / scroll lock layer.
+-- Compatibility layer: hotkeys / modal pointer routing / scroll locking.
 Fawn.Rules.OriginalFawnKeybindCapture=true
 Fawn.Rules.PopupOwnsAllPointerState=true
 Fawn.Rules.ExactWidgetHitboxes=true
@@ -6129,11 +6130,11 @@ if not paintOK then paintOK=registerEvent("paint",paintEvent)end
 if not updateOK then -- fallback keeps normal controls usable on runtimes without onUpdate
     registerEvent("onPaint",function()updateEvent()end)
 end
-Fawn.Runtime={InputEvent=updateOK and"onUpdate"or"onPaint fallback",PaintEvent=paintOK and"onPaint"or"paint",Font="Verdana",Reference="3(1).lua Neverlose geometry + original Fawn behavioral contract",Renderer="9.8.3 unified shell + modal pointer routing + managed storage + preset settings",NoFakeShadows=true,SolidOutline=true,CorrectDrawImageSignature="textureId,x,y,w,h,r,g,b,a",ContainerScrolling="reserved section/page gutters + nested ownership + hover/drag accent feedback",Resize="deferred mouse-anchored UI scale + frozen screen-space physical resize",ESPWidgets="original Fawn cursor-follow drag parity + 8-slot commit + stacking reorder, reset and shuffle tools",ColorPicker="original Fawn HSV/SV + hue + alpha picker with color clipboard",Input="original Fawn caret-aware single-line text input with horizontal text window",DropdownScroll="fractional visual interpolation + numeric drag geometry + dedicated gutter",AccessoryPopup="extensible embedded-keybind three-dot popup",KeybindMode="original Fawn: left-click armed capture; Backspace clears; right-click Hold/Toggle/Always On; settings toggle key works while preserving edit isolation",Outline="single solid outer outline + inset rounded strokes",ContainerSeparation="stable gutters + no implicit column splits + responsive wrap geometry"}
+Fawn.Runtime={InputEvent=updateOK and"onUpdate"or"onPaint fallback",PaintEvent=paintOK and"onPaint"or"paint",Font="Verdana",Reference="Fawn Modern reference geometry + Fawn behavioral contract",Renderer="9.8.3 unified shell + modal pointer routing + managed storage + preset settings",NoFakeShadows=true,SolidOutline=true,CorrectDrawImageSignature="textureId,x,y,w,h,r,g,b,a",ContainerScrolling="reserved section/page gutters + nested ownership + hover/drag accent feedback",Resize="deferred mouse-anchored UI scale + frozen screen-space physical resize",ESPWidgets="original Fawn cursor-follow drag parity + 8-slot commit + stacking reorder, reset and shuffle tools",ColorPicker="original Fawn HSV/SV + hue + alpha picker with color clipboard",Input="original Fawn caret-aware single-line text input with horizontal text window",DropdownScroll="fractional visual interpolation + numeric drag geometry + dedicated gutter",AccessoryPopup="extensible embedded-keybind three-dot popup",KeybindMode="original Fawn: left-click armed capture; Backspace clears; right-click Hold/Toggle/Always On; settings toggle key works while preserving edit isolation",Outline="single solid outer outline + inset rounded strokes",ContainerSeparation="stable gutters + no implicit column splits + responsive wrap geometry"}
 
 
 -- 9.8 integrated finishing layer ---------------------------------------------------
-(function(Fawn)
+do local function __fawn_apply_981(Fawn)
     if Fawn.__Polish98 then return end
 
 local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
@@ -6482,7 +6483,7 @@ function Fawn:CreateSettingsPage(window,opt)
 end
 
 -- Final shell pass: one rounded root, no stacked bottom/top masks.
--- 9.7 already clips content in its layout/Section pass, so repainting thin full-width
+-- Content is already clipped in the layout/Section pass, so repainting thin full-width
 -- chrome masks only damages the outer radii and creates the disconnected-corner look.
 function Window:_render()
     if self.destroyed then return end
@@ -6523,7 +6524,7 @@ Fawn.PolishVersion="9.8.3-complete-customization"
 Fawn.PolishBuildId="fawnui-polish-9.8.3-complete-customization-20260916"
 Fawn.Version="9.8.3-serotonin"
 Fawn.APIRevision=39
-Fawn.BuildId="fawnui-serotonin-9.8.3-preset-settings-managed-storage-20260916"
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.SurfaceMaterials=true
 Fawn.DynamicCapabilities.MotionStyles=true
@@ -6534,10 +6535,12 @@ Fawn.DynamicCapabilities.WrappedBrandSubtitle=true
 Fawn.Runtime=Fawn.Runtime or{}
 Fawn.Runtime.PixelPolish98="single shell sidebar + glass-safe profile footer + wrapped brand subtitle + single-pass outlines"
 Fawn.__Polish98=true
-end)(Fawn)
+end
+__fawn_apply_981(Fawn)
+end
 
--- Fawn Modern 9.8.2 customization, storage and secondary-UI cleanup pass.
-(function(Fawn)
+-- Fawn Modern 9.8.3 customization, storage and secondary-UI cleanup pass.
+do local function __fawn_apply_982(Fawn)
 local Window=Fawn.Classes.Window
 local Overlay=Fawn.Classes.Overlay
 local ESPPreview=Fawn.Classes.ESPPreview
@@ -6831,7 +6834,7 @@ function Fawn:CreateSettingsPage(window,opt)
     page.Controls.Theme=appearance:Dropdown("Theme",Fawn.ThemeNames,ti,{noConfig=true});page.Controls.Theme:OnChanged(function(v)window:SetTheme(v);if page._syncColors then page:_syncColors()end end)
     page.Controls.Scale=appearance:Slider("UI Scale",55,165,round982(window:GetScale()*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.Scale:OnChanged(function(v)window:SetScale(v/100)end)
     appearance:AddSeparator("MATERIAL")
-    local mats=Fawn.SurfaceStyles or{"Solid","Frosted","Acrylic","Smoke","Clear"};page.Controls.SurfaceStyle=appearance:Dropdown("Surface Material",mats,indexOf(mats,window:GetSurfaceStyle and window:GetSurfaceStyle()or"Solid")or 1,{noConfig=true});page.Controls.SurfaceStyle:OnChanged(function(v)if window.SetSurfaceStyle then window:SetSurfaceStyle(v)end;if page.Controls.Glass then page.Controls.Glass:Set(window:GetLiquidGlass(),true)end end)
+    local mats=Fawn.SurfaceStyles or{"Solid","Frosted","Acrylic","Smoke","Clear"};page.Controls.SurfaceStyle=appearance:Dropdown("Surface Material",mats,indexOf(mats,window.GetSurfaceStyle and window:GetSurfaceStyle()or"Solid")or 1,{noConfig=true});page.Controls.SurfaceStyle:OnChanged(function(v)if window.SetSurfaceStyle then window:SetSurfaceStyle(v)end;if page.Controls.Glass then page.Controls.Glass:Set(window:GetLiquidGlass(),true)end end)
     page.Controls.Glass=appearance:Toggle("Liquid Glass",window:GetLiquidGlass(),{noConfig=true});page.Controls.Glass:OnChanged(function(v)window:SetLiquidGlass(v);if page.Controls.SurfaceStyle and window.GetSurfaceStyle then page.Controls.SurfaceStyle:Set(window:GetSurfaceStyle(),true)end end)
     page.Controls.GlassOpacity=appearance:Slider("Glass Opacity",18,100,round982(window:GetGlassOpacity()*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.GlassOpacity:OnChanged(function(v)window:SetGlassOpacity(v/100)end)
     if window.GetGlassTint then page.Controls.GlassTint=appearance:ColorPicker("Glass Tint",window:GetGlassTint(),{noConfig=true});page.Controls.GlassTint:OnChanged(function(v)window:SetGlassTint(v)end)end
@@ -6972,7 +6975,7 @@ end
 
 Fawn.Version="9.8.3-serotonin"
 Fawn.APIRevision=39
-Fawn.BuildId="fawnui-serotonin-9.8.3-preset-settings-managed-storage-20260916"
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916"
 Fawn.PolishVersion="9.8.3-complete-customization"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.ProfileMenuAuthoring=true
@@ -6988,11 +6991,13 @@ Fawn.Runtime.ProfileMenu="fully authored built-ins/custom rows/separators + dyna
 Fawn.Runtime.SecondaryUI="uniform popup/overlay padding, inset dividers and rounded notification accents"
 Fawn.Runtime.ContainerCorners="rounded visible slices + no translucent scrollbar gutter overdraw"
 Fawn.Runtime.ESPElementDrag="expanded hit targets + drag capture wins over frame drag"
-end)(Fawn)
+end
+__fawn_apply_982(Fawn)
+end
 
 
 -- Fawn Modern 9.8.3 preset-settings + sandbox-correct managed storage pass.
-(function(Fawn)
+do local function __fawn_apply_983(Fawn)
 local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
 local SettingsPage=assert(Fawn.Classes and Fawn.Classes.SettingsPage,"Fawn SettingsPage class missing")
 local ROOT="Fawn Modern"
@@ -7146,7 +7151,7 @@ end
 
 Fawn.Version="9.8.3-serotonin"
 Fawn.APIRevision=39
-Fawn.BuildId="fawnui-serotonin-9.8.3-preset-settings-managed-storage-20260916"
+Fawn.BuildId="fawn-modern-9.8.3-api39-hotfix1-20260916"
 Fawn.PolishVersion="9.8.3-complete-customization"
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.PresetSettingsMenu=true
@@ -7157,6 +7162,12 @@ Fawn.Runtime=Fawn.Runtime or{}
 Fawn.Runtime.StorageRoot=ROOT
 Fawn.Runtime.StoragePaths=cp983(PATHS)
 Fawn.Runtime.PresetSettings="Window:AddPresetSettingsMenu / presetSettings window option / profile-only mounting"
-end)(Fawn)
+Fawn.ProductName="Fawn Modern"
+Fawn.DisplayName="Fawn Modern 9.8.3"
+Fawn.Namespace="FawnModern"
+Fawn.ReleaseStamp="983-api39-hotfix1"
+end
+__fawn_apply_983(Fawn)
+end
 
 return Fawn
