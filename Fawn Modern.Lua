@@ -9633,66 +9633,173 @@ end
 local function accDrawColor(win,parent,ch)
     local c=ch.control
     if not alive(c)then parent.child=nil;return end
+
     local s=win.scale
-    ch.w=232*s;ch.h=238*s;ch.anchorY=ch.triggerY
-    win:_clampPopup(ch);win:_popupFrame(ch)
+    local sw,sh=screenSize()
+    local w,h=278*s,286*s
+    local tx=ch.triggerX or ch.x or 8
+    local ty=ch.triggerY or ch.y or 8
+    local tw=ch.triggerW or 20*s
+
+    local x=tx+tw+10*s
+    if x+w>sw-8 then x=tx-w-10*s end
+    x=clamp(x,8,max(8,sw-w-8))
+    local y=clamp(ty-14*s,8,max(8,sh-h-8))
+    ch.x,ch.y,ch.w,ch.h=x,y,w,h
 
     local arr=c.value
     local hue,sat,val=rgbToHsv92(arr[1],arr[2],arr[3])
-    local svx,svy,svw,svh=ch.x+12*s,ch.y+39*s,158*s,108*s
-    local hx,hy,hw,hh=ch.x+181*s,ch.y+39*s,16*s,108*s
-    local ax,ay,aw,ah=ch.x+12*s,ch.y+169*s,185*s,12*s
-    textC(upper(c.label or"COLOR"),ch.x+12*s,ch.y+17*s,win:_color("text"),13*s,"Verdana")
+    local main=win:_color("menuBg")
+    local card=win:_color("card")
+    local border=win:_color("outline")
+    local textCol=win:_color("text")
+    local dim=win:_color("muted")
+    local white=win:_color("white")
 
-    local cols=max(8,floor(Fawn.Performance.ColorPickerCols or 14))
-    local rows=max(6,floor(Fawn.Performance.ColorPickerRows or 10))
-    local cw,chh=svw/cols,svh/rows
-    for iy=0,rows-1 do
-        local vv=1-iy/max(1,rows-1)
-        for ix=0,cols-1 do
-            local ss=ix/max(1,cols-1)
-            local r,g,b=hsvToRgb92(hue,ss,vv)
-            rect(svx+ix*cw,svy+iy*chh,cw+1,chh+1,{r,g,b,255},0,255)
+    local svx,svy,svw,svh=x+14*s,y+52*s,202*s,138*s
+    local hx,hy,hw,hh=x+228*s,y+52*s,22*s,138*s
+    local ax,ay,aw,ah=x+14*s,y+218*s,236*s,16*s
+
+    -- Same popup shell/header as the original Fawn picker.
+    rect(x,y,w,h,main,11*s,252)
+    win:_out(x,y,w,h,11*s,1,border,235)
+    rect(x+1*s,y+1*s,w-2*s,40*s,card,10*s,245)
+    line(x+12*s,y+40*s,x+w-12*s,y+40*s,border,max(1,s),180)
+    text(c.label or"COLOR",x+14*s,y+15*s,textCol,13*s,"Verdana")
+
+    -- Same live checkerboard preview.
+    local pvx,pvy=x+w-72*s,y+11*s
+    local pvw,pvh=42*s,20*s
+    rect(pvx,pvy,pvw,pvh,card,6*s,255)
+    win:_out(pvx,pvy,pvw,pvh,6*s,1,border,255)
+    local pix,piy,piw,pih=pvx+3*s,pvy+3*s,pvw-6*s,pvh-6*s
+    local tile=4*s
+    for yy=0,max(0,ceil(pih/tile)-1)do
+        for xx=0,max(0,ceil(piw/tile)-1)do
+            local qx,qy=pix+xx*tile,piy+yy*tile
+            local qw,qh=min(tile,pix+piw-qx),min(tile,piy+pih-qy)
+            if qw>0 and qh>0 then
+                rect(qx,qy,qw,qh,((xx+yy)%2==0)and{72,70,78,255}or{39,38,44,255},0,255)
+            end
         end
     end
-    win:_out(svx-1*s,svy-1*s,svw+2*s,svh+2*s,4*s,.8,win:_color("outline"),210)
-    local sx,sy=svx+sat*svw,svy+(1-val)*svh
-    circle(sx,sy,3.2*s,win:_color("white"),255);outline(sx-4.2*s,sy-4.2*s,8.4*s,8.4*s,win:_color("black"),4.2*s,190,max(.8,s))
+    rect(pix,piy,piw,pih,arr,4*s,arr[4]or 255)
 
-    local hs=max(12,floor(Fawn.Performance.ColorPickerHueSteps or 24))
-    for i=0,hs-1 do
-        local r,g,b=hsvToRgb92(i/max(1,hs-1),1,1)
-        rect(hx,hy+i*(hh/hs),hw,hh/hs+1,{r,g,b,255},0,255)
-    end
-    win:_out(hx-1*s,hy-1*s,hw+2*s,hh+2*s,3*s,.8,win:_color("outline"),210)
-    rect(hx-2*s,hy+hue*hh-1*s,hw+4*s,2*s,win:_color("white"),1*s,255)
+    local closeX,closeY=x+w-18*s,y+20*s
+    line(closeX-3*s,closeY-3*s,closeX+3*s,closeY+3*s,dim,max(1,s),255)
+    line(closeX+3*s,closeY-3*s,closeX-3*s,closeY+3*s,dim,max(1,s),255)
 
-    win:_fill("control",ax,ay,aw,ah,"control",4*s)
-    local alphaSteps=max(16,floor(Fawn.Performance.ColorPickerAlphaSteps or 48))
-    local seg=aw/alphaSteps
-    for i=0,alphaSteps-1 do
-        local aa=round(i/max(1,alphaSteps-1)*255)
-        rect(ax+i*seg,ay,seg+1,ah,{arr[1],arr[2],arr[3],255},0,aa)
+    -- Same original 202x138 SV field.
+    rect(svx-1*s,svy-1*s,svw+2*s,svh+2*s,card,6*s,255)
+    win:_out(svx-1*s,svy-1*s,svw+2*s,svh+2*s,6*s,1,border,210)
+    local isvx,isvy,isvw,isvh=svx+1*s,svy+1*s,svw-2*s,svh-2*s
+    local cols,rows=72,50
+    local cw,chh=isvw/cols,isvh/rows
+    for iy=0,rows-1 do
+        local vv=1-(iy/(rows-1))
+        for ix=0,cols-1 do
+            local ss=ix/(cols-1)
+            local r,g,b=hsvToRgb92(hue,ss,vv)
+            rect(isvx+ix*cw,isvy+iy*chh,cw+1.05*s,chh+1.05*s,{r,g,b,255},0,255)
+        end
     end
-    win:_out(ax,ay,aw,ah,4*s,.8,win:_color("outline"),210)
-    rect(ax+(arr[4]or 255)/255*aw-1*s,ay-1*s,2*s,ah+2*s,win:_color("white"),1*s,255)
+    local sx=isvx+sat*isvw
+    local sy=isvy+(1-val)*isvh
+    rect(sx-2*s,sy-2*s,4*s,4*s,white,2*s,255)
+
+    -- Same original 22x138 hue strip.
+    rect(hx-1*s,hy-1*s,hw+2*s,hh+2*s,card,6*s,255)
+    win:_out(hx-1*s,hy-1*s,hw+2*s,hh+2*s,6*s,1,border,210)
+    local ihx,ihy,ihw,ihh=hx+1*s,hy+1*s,hw-2*s,hh-2*s
+    local steps=138
+    local hs=ihh/steps
+    for i=0,steps-1 do
+        local r,g,b=hsvToRgb92(i/(steps-1),1,1)
+        rect(ihx,ihy+i*hs,ihw,hs+1.1*s,{r,g,b,255},0,255)
+    end
+    rect(hx-2*s,ihy+hue*ihh-1*s,hw+4*s,2*s,white,1*s,255)
+
+    -- Same checkerboard transparency strip.
+    text("TRANSPARENCY",ax,ay-18*s,dim,13*s,"Verdana")
+    rect(ax,ay,aw,ah,card,6*s,255)
+    win:_out(ax,ay,aw,ah,6*s,1,border,255)
+    local iax,iay,iaw,iah=ax+2*s,ay+2*s,aw-4*s,ah-4*s
+    local checker=6*s
+    for yy=0,max(0,ceil(iah/checker)-1)do
+        for xx=0,max(0,ceil(iaw/checker)-1)do
+            local qx,qy=iax+xx*checker,iay+yy*checker
+            local qw,qh=min(checker,iax+iaw-qx),min(checker,iay+iah-qy)
+            if qw>0 and qh>0 then
+                rect(qx,qy,qw,qh,((xx+yy)%2==0)and{72,70,78,255}or{39,38,44,255},0,255)
+            end
+        end
+    end
+    local gax,gay,gaw,gah=iax+1*s,iay+1*s,iaw-2*s,iah-2*s
+    local pixels=max(1,floor(gaw))
+    for i=0,pixels-1 do
+        local aa=floor((i/max(1,pixels-1))*255+.5)
+        rect(gax+i,gay,1,gah,{arr[1],arr[2],arr[3],255},0,aa)
+    end
+    rect(iax+iaw-5*s,iay,5*s,iah,{arr[1],arr[2],arr[3],255},4*s,255)
+    local alphaX=gax+((arr[4]or 255)/255)*gaw
+    rect(alphaX-1*s,gay-1*s,2*s,gah+2*s,white,1*s,255)
+
+    -- Same HEX / Alpha readouts.
+    local hex=format("#%02X%02X%02X",arr[1],arr[2],arr[3])
+    local ap=floor(((arr[4]or 255)/255)*100+.5)
+    local bx1,by1,bw1,bh1=x+14*s,y+248*s,112*s,25*s
+    local bx2=x+138*s
+    rect(bx1,by1,bw1,bh1,card,6*s,255)
+    win:_out(bx1,by1,bw1,bh1,6*s,1,border,210)
+    local htw=measure(hex,13*s,"Verdana")
+    textC(hex,bx1+(bw1-htw)*.5,by1+bh1*.5,textCol,13*s,"Verdana")
+    rect(bx2,by1,bw1,bh1,card,6*s,255)
+    win:_out(bx2,by1,bw1,bh1,6*s,1,border,210)
+    local alphaText="Alpha "..tostring(ap).."%"
+    local atw=measure(alphaText,13*s,"Verdana")
+    textC(alphaText,bx2+(bw1-atw)*.5,by1+bh1*.5,dim,13*s,"Verdana")
 
     local function apply(kind)
         local h0,s0,v0=rgbToHsv92(arr[1],arr[2],arr[3])
         local q=copy(arr)
-        if kind=="sv"then s0=clamp((Input.mx-svx)/svw,0,1);v0=1-clamp((Input.my-svy)/svh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
-        elseif kind=="h"then h0=clamp((Input.my-hy)/hh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
-        else q[4]=round(clamp((Input.mx-ax)/aw,0,1)*255)end
+        if kind=="sv"then
+            s0=clamp((Input.mx-isvx)/isvw,0,1)
+            v0=1-clamp((Input.my-isvy)/isvh,0,1)
+            q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
+        elseif kind=="h"then
+            h0=clamp((Input.my-ihy)/ihh,0,1)
+            q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
+        else
+            q[4]=floor(clamp((Input.mx-gax)/gaw,0,1)*255+.5)
+        end
         c:Set(q)
     end
 
+    -- Strict accessory-child modality: every pointer press inside the picker
+    -- belongs to the picker and can never activate accessory rows underneath.
     if Input.click and not win._consumed then
-        if win:_hit(svx,svy,svw,svh)then ch.drag="sv";apply("sv");win:_consume()
-        elseif win:_hit(hx,hy,hw,hh)then ch.drag="h";apply("h");win:_consume()
-        elseif win:_hit(ax,ay,aw,ah)then ch.drag="a";apply("a");win:_consume()end
+        if win:_hit(closeX-8*s,closeY-8*s,16*s,16*s)then
+            parent.child=nil
+            win:_consume()
+            return
+        elseif win:_hit(isvx,isvy,isvw,isvh)then
+            ch.drag="sv";apply("sv");win:_consume()
+        elseif win:_hit(ihx,ihy,ihw,ihh)then
+            ch.drag="h";apply("h");win:_consume()
+        elseif win:_hit(gax,gay,gaw,gah)then
+            ch.drag="a";apply("a");win:_consume()
+        elseif win:_hit(x,y,w,h)then
+            win:_consume()
+        end
+    elseif Input.rightClick and not win._consumed and win:_hit(x,y,w,h)then
+        win:_consume()
     end
-    if ch.drag then if Input.left then apply(ch.drag)else ch.drag=nil end end
+
+    if ch.drag then
+        if Input.left then apply(ch.drag)else ch.drag=nil end
+    end
 end
+
 
 local function accDrawRow(win,parent,c,x,y,w,h,C,locked)
     local s=win.scale
@@ -9721,14 +9828,34 @@ local function accDrawRow(win,parent,c,x,y,w,h,C,locked)
     end
 
     if c.type=="color"then
-        local nominal=(C==REF.Compact)and REF.ColorChipCompact or REF.ColorChipFull
-        local sz=min(C.sw,nominal)*s;local fx=right-sz;local fy=cy-sz*.5
-        local ch=parent.child;local opened=ch and ch.control==c and ch.kind=="color"
-        win:_fill("control",fx,fy,sz,sz,opened and"controlHover"or"control",min(8*s,sz*.24))
-        rect(fx+1*s,fy+1*s,sz-2*s,sz-2*s,c.value,max(1,min(8*s,sz*.24)-1*s),c.value[4]or 255)
-        win:_out(fx,fy,sz,sz,min(8*s,sz*.24),.9,win:_color("outline"),220)
-        if (not locked or opened)and Input.click and not win._consumed and win:_hit(fx,fy,sz,sz)then
-            accOpenChild(win,parent,"color",c,fx+sz-232*s,fy+sz+6*s,232*s,238*s,fx,fy,sz,sz)
+        local sz=20*s
+        local fx=right-sz
+        local fy=cy-sz*.5
+        local ch=parent.child
+        local opened=ch and ch.control==c and ch.kind=="color"
+        local hov=win:_hit(fx-3*s,fy-3*s,sz+6*s,sz+6*s)
+        local hv=hov and 1 or 0
+
+        rect(fx,fy,sz,sz,win:_color("card"),5*s,255)
+        win:_out(fx,fy,sz,sz,5*s,1,blend(win:_color("outline"),win:_color("accent"),hv*.22),255)
+
+        local ix,iy,iw,ih=fx+2*s,fy+2*s,sz-4*s,sz-4*s
+        local tile=4*s
+        local cols=max(1,ceil(iw/tile))
+        local rows=max(1,ceil(ih/tile))
+        for yy=0,rows-1 do
+            for xx=0,cols-1 do
+                local qx,qy=ix+xx*tile,iy+yy*tile
+                local qw,qh=min(tile,ix+iw-qx),min(tile,iy+ih-qy)
+                if qw>0 and qh>0 then
+                    rect(qx,qy,qw,qh,((xx+yy)%2==0)and{72,70,78,255}or{39,38,44,255},0,255)
+                end
+            end
+        end
+        rect(ix,iy,iw,ih,c.value,4*s,c.value[4]or 255)
+
+        if (not locked or opened)and Input.click and not win._consumed and hov then
+            accOpenChild(win,parent,"color",c,fx+sz+10*s,fy-14*s,278*s,286*s,fx,fy,sz,sz)
             win:_consume()
         end
         return
@@ -9813,17 +9940,18 @@ function Window:_drawExtraPopup()
     end
 end
 
-Fawn.Version="10.0.7-serotonin"
-Fawn.APIRevision=47
-Fawn.BuildId="fawn-modern-10.0.7-original-colorpicker-20260917"
-Fawn.PolishVersion="10.0.7"
+Fawn.Version="10.0.8-serotonin"
+Fawn.APIRevision=48
+Fawn.BuildId="fawn-modern-10.0.8-original-accessory-colorpicker-20260917"
+Fawn.PolishVersion="10.0.8"
 Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
 Fawn.DynamicCapabilities.ProtectedNativeDraw=true
 Fawn.DynamicCapabilities.StrictDropdownChromeModal=true
 Fawn.DynamicCapabilities.RawManagedImageDraw=true
 Fawn.DynamicCapabilities.OriginalFawnColorPicker=true
 Fawn.DynamicCapabilities.StrictColorPickerModal=true
-Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; original Fawn color picker; typed accessory sliders"
+Fawn.DynamicCapabilities.OriginalAccessoryColorPicker=true
+Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; exact original Fawn 278x286 color picker and 20px checkerboard chip; typed accessory sliders"
 Fawn:SetPerformanceMode("Peak")
 
 Fawn.DynamicCapabilities.PopupPointerIsolation=true
