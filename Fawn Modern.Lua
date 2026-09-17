@@ -1026,9 +1026,10 @@ local function drawImage(id,x,y,w,h,a)
     if type(fn)~="function"then return false end
     if type(x)~="number"or type(y)~="number"or type(w)~="number"or type(h)~="number"or w<=0 or h<=0 then return false end
     x,y,w,h=floor(x+.5),floor(y+.5),max(1,floor(w+.5)),max(1,floor(h+.5))
-    -- Managed/custom images are deliberately isolated from the theme renderer:
-    -- pure white modulation + full opacity, every time.
-    local ok,err=pcall(fn,id,x,y,w,h,IMAGE_WHITE,1)
+    -- Deliberately use the raw 5-argument image overload. This is the same form
+    -- used by the working Serotonin image/GIF path and applies no library tint,
+    -- color multiplication, alpha override, glass tint, or theme color.
+    local ok,err=pcall(fn,id,x,y,w,h)
     if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
     return ok
 end
@@ -7459,23 +7460,58 @@ local function imageBytesValid(data)
     return true
 end
 local function loadManaged(path,force)
-    path=tostring(path or"")
+    path=normalizeSandboxFinal(path)
     if path==""then return nil,"empty path" end
     if not force and managedTextures[path]~=nil then
         local cached=managedTextures[path]
-        return cached or nil,cached and nil or(imageErrors[path]or"image load failed")
+        return cached or nil,cached and nil or(imageErrors[path]or"image load failed"),path
     end
     managedTextures[path]=nil;imageErrors[path]=nil
     local f=fsFinal();if not f or type(f.read)~="function"then imageErrors[path]="file.read unavailable";return nil,imageErrors[path] end
-    local ok,data=pcall(f.read,path)
-    if not ok or type(data)~="string"or data==""then imageErrors[path]="could not read "..path;managedTextures[path]=false;return nil,imageErrors[path] end
-    local valid,why=imageBytesValid(data);if not valid then imageErrors[path]=why;managedTextures[path]=false;return nil,why end
     local loader=utility and utility.LoadImage
     if type(loader)~="function"then imageErrors[path]="utility.LoadImage unavailable";managedTextures[path]=false;return nil,imageErrors[path] end
-    local ok2,id=pcall(loader,data)
-    if ok2 and type(id)=="number"and id>0 then managedTextures[path]=id;return id end
-    imageErrors[path]=ok2 and"utility.LoadImage returned no texture"or tostring(id)
-    managedTextures[path]=false;return nil,imageErrors[path]
+
+    local candidates,seen={},{}
+    local function add(v)
+        v=normalizeSandboxFinal(v)
+        local k=lower(v)
+        if v~=""and not seen[k]then seen[k]=true;candidates[#candidates+1]=v end
+    end
+    local base=basenameFinal(path)
+    add(path)
+    local l=lower(path)
+    if l:find("profile pictures/",1,true)then
+        add(PATHS.ProfilePictures.."/"..base);add("Profile Pictures/"..base)
+    elseif l:find("logo pictures/",1,true)then
+        add(PATHS.LogoPictures.."/"..base);add("Logo Pictures/"..base);add("logo pictures/"..base)
+    else
+        add(PATHS.ProfilePictures.."/"..base);add(PATHS.LogoPictures.."/"..base)
+    end
+    add(base)
+
+    local failures={}
+    for _,candidate in ipairs(candidates)do
+        local ok,data=pcall(f.read,candidate)
+        if ok and type(data)=="string"and data~=""then
+            local valid,why=imageBytesValid(data)
+            if valid then
+                local ok2,id=pcall(loader,data)
+                if ok2 and type(id)=="number"and id>0 then
+                    managedTextures[path]=id;managedTextures[candidate]=id
+                    imageErrors[path]=nil;imageErrors[candidate]=nil
+                    return id,nil,candidate
+                end
+                failures[#failures+1]=candidate..": "..(ok2 and"LoadImage returned no texture"or tostring(id))
+            else
+                failures[#failures+1]=candidate..": "..tostring(why)
+            end
+        else
+            failures[#failures+1]=candidate..": unreadable"
+        end
+    end
+    imageErrors[path]=table.concat(failures," | ")
+    managedTextures[path]=false
+    return nil,imageErrors[path]
 end
 
 Fawn.StoragePaths={Root=ROOT,Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}
@@ -7515,7 +7551,8 @@ local function applyManagedImage(self,field,pathField,retryField,kind,v,force)
     if type(v)~="string"or v==""or v:sub(1,1)=="(" then self[field]=nil;self[pathField]=nil;self[retryField]=nil;return false,"no image selected" end
     local path=resolveFinal(kind,v);self[pathField]=path;self[retryField]=nil
     if force then managedTextures[path]=nil;imageErrors[path]=nil end
-    local tex,err=loadManaged(path,force==true);self[field]=tex
+    local tex,err,used=loadManaged(path,force==true);self[field]=tex
+    if tex and used then self[pathField]=used end
     return tex~=nil,err
 end
 function Window:SetProfileImage(v,force)local ok=applyManagedImage(self,"profileImage","profileImagePath","_profileImageRetry","ProfilePictures",v,force);return self,ok end
@@ -9614,10 +9651,88 @@ function Window:_drawExtraPopup()
     end
 end
 
-Fawn.Version="10.0.4-serotonin"
-Fawn.APIRevision=44
-Fawn.BuildId="fawn-modern-10.0.4-stable-native-draw-20260917"
-Fawn.PolishVersion="10.0.4"
+;(function()
+local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
+
+local function strictDropdownModal(w)
+    if not w then return false end
+    if w.openDrop then return true end
+    local p=w.extraPopup
+    local ch=p and p.child
+    return ch and(ch.kind=="dropdown"or ch.kind=="color")or false
+end
+
+local function muted(fn,self,...)
+    local state={Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel}
+    Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=false,false,false,false,false,false,0
+    local ok,a,b,c,d,e=pcall(fn,self,...)
+    Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=state[1],state[2],state[3],state[4],state[5],state[6],state[7]
+    if not ok then error(a)end
+    return a,b,c,d,e
+end
+
+local contentBase=Window._drawContent
+function Window:_drawContent()
+    if self.openDrop and Input.click and not self._consumed then
+        local p=self.openDrop
+        if p.triggerX and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
+            self.openDrop=nil;self:_consume()
+        end
+    end
+    if self.extraPopup and Input.click and not self._consumed then
+        local p=self.extraPopup
+        if p.triggerX and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
+            self.extraPopup=nil;self:_consume()
+        end
+    end
+    if self:_hasPopup()then return muted(contentBase,self)end
+    return contentBase(self)
+end
+
+local sidebarBase=Window._drawSidebar
+function Window:_drawSidebar()
+    if strictDropdownModal(self)then return muted(sidebarBase,self)end
+    return sidebarBase(self)
+end
+
+local topbarBase=Window._drawTopbar
+function Window:_drawTopbar()
+    if strictDropdownModal(self)then return muted(topbarBase,self)end
+    return topbarBase(self)
+end
+
+local panelBase=Window._drawPanelHeader
+function Window:_drawPanelHeader()
+    if strictDropdownModal(self)then return muted(panelBase,self)end
+    return panelBase(self)
+end
+
+local dragBase=Window._updateWindowDragResize
+function Window:_updateWindowDragResize()
+    if strictDropdownModal(self)and not self.dragging and not self.resizing then return end
+    return dragBase(self)
+end
+
+local popupBase=Window._drawDropdownPopup
+function Window:_drawDropdownPopup()
+    local p=self.openDrop
+    local inside=p and p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)
+    local pressed=Input.click or Input.rightClick
+    local a,b,c,d=popupBase(self)
+    if inside and pressed and not self._consumed then self:_consume()end
+    return a,b,c,d
+end
+
+Fawn.DynamicCapabilities.StrictDropdownModal=true
+Fawn.DynamicCapabilities.ManagedImagePathRecovery=true
+Fawn.Runtime.ModalPointer="every dropdown owns pointer input over content/sidebar/topbar/header; covered controls cannot receive the same click"
+Fawn.Runtime.ManagedImages="raw 5-argument draw.Image with no tint/alpha + multi-path sandbox recovery + cached LoadImage"
+end)()
+
+Fawn.Version="10.0.5-serotonin"
+Fawn.APIRevision=45
+Fawn.BuildId="fawn-modern-10.0.5-strict-dropdown-images-20260917"
+Fawn.PolishVersion="10.0.5"
 Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
 Fawn.DynamicCapabilities.ProtectedNativeDraw=true
 Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; no shared page popup state; typed accessory sliders"
@@ -9632,7 +9747,7 @@ Fawn.DynamicCapabilities.UltraPeakRenderer=true
 Fawn.DynamicCapabilities.ReusedControlRects=true
 Fawn.Runtime.AccessoryPopupFinal="exclusive popup-layer pointer routing; nested dropdown/color/key children; left/right-click numeric slider editor"
 Fawn.Runtime.ESPPreview="clean corner-box preview; optional visibility; draggable slot widgets with stable release commit"
-Fawn.Runtime.ManagedImages="explicit white/full-alpha draw.Image only; custom logo/profile images are not theme-tinted"
+Fawn.Runtime.ManagedImages="raw 5-argument draw.Image only; no library color/alpha/tint arguments; multi-path sandbox recovery + cached LoadImage"
 Fawn.Runtime.Performance="Peak: protected native drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + cached text/colors + reduced color-picker/snow budgets"
 
 end
