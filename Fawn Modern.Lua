@@ -6122,8 +6122,11 @@ local function paintEvent()
 
     local popupOwner=nil
     for i=#E.windows,1,-1 do local w=E.windows[i];if hasModal97(w)then popupOwner=w;break end end
+    -- Docked ESP editors are rendered from inside their parent Window. Once a widget drag
+    -- begins, that parent must keep the real held/release mouse state or the editor sees a
+    -- false release on the next paint and immediately snaps the widget back.
     local activeOverlay=nil
-    if not popupOwner then for i=#E.overlays,1,-1 do local o=E.overlays[i];if alive(o)and(o._dragState or o._espDrag)then activeOverlay=o;break end end end
+    if not popupOwner then for i=#E.overlays,1,-1 do local o=E.overlays[i];if alive(o)and(o._dragState or o._espDrag or o._dragElement)then activeOverlay=o;break end end end
     local activeWindow=nil
     if not popupOwner and not activeOverlay then for i=#E.windows,1,-1 do local w=E.windows[i];if windowActiveCapture97(w)then activeWindow=w;break end end end
     local frontOverlay=nil
@@ -6142,7 +6145,11 @@ local function paintEvent()
     if raw.click then if popupOwner then moveWindowTop96(popupOwner)elseif frontOverlay then moveOverlayTop96(frontOverlay)elseif windowOwner then moveWindowTop96(windowOwner)elseif backOverlay then moveOverlayTop96(backOverlay)end end
 
     for _,o in ipairs(E.overlays)do if alive(o)and o.layer=="back"and not(o.kind=="ESPPreview"and o.docked)and type(o._render)=="function"then pointer(backOverlay==o and not popupOwner);protected(o._render,o)end end
-    for _,w in ipairs(E.windows)do if alive(w)then local owns=popupOwner==w or(not popupOwner and not activeOverlay and not frontOverlay and windowOwner==w);pointer(owns);protected(w._render,w)end end
+    for _,w in ipairs(E.windows)do if alive(w)then
+        local dockedESP=activeOverlay and activeOverlay.kind=="ESPPreview"and activeOverlay.docked and activeOverlay.window==w
+        local owns=dockedESP or popupOwner==w or(not popupOwner and not activeOverlay and not frontOverlay and windowOwner==w)
+        pointer(owns);protected(w._render,w)
+    end end
     for _,o in ipairs(E.overlays)do if alive(o)and o.layer~="back"and not(o.kind=="ESPPreview"and o.docked)and type(o._render)=="function"then pointer(frontOverlay==o and not popupOwner);protected(o._render,o)end end
 
     -- Notifications cannot be clicked through a modal popup either.
@@ -7780,9 +7787,10 @@ end
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.ResponsiveSecondaryWindows=true
 Fawn.DynamicCapabilities.PersistentESPElementCapture=true
+Fawn.DynamicCapabilities.DockedESPDragOwnership=true
 Fawn.DynamicCapabilities.ManagedImageFallbackDraw=true
 Fawn.Runtime=Fawn.Runtime or{}
-Fawn.Runtime.ESPElementDrag="original Fawn slot drag + docked/standalone persistent pointer capture"
+Fawn.Runtime.ESPElementDrag="original Fawn cursor-follow slot drag + release commit + docked parent-window pointer ownership"
 Fawn.Runtime.SecondaryUI="responsive topbar + automatic narrow-column reflow + bounded panel header"
 Fawn.Runtime.ManagedImages="sandbox-normalized paths + LoadImage cache + 5-arg draw.Image compatibility + timed retry"
 end
