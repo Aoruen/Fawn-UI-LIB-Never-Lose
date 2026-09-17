@@ -6152,6 +6152,13 @@ function Window:_render()
             self:_consume()
         end
     end
+    if self.colorPopup and Input.click and not self._consumed then
+        local p=self.colorPopup
+        if p.triggerX and p.triggerY and p.triggerW and p.triggerH and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
+            self.colorPopup=nil
+            self:_consume()
+        end
+    end
 
     -- Never begin a new window drag/resize through a popup.
     if not self:_hasPopup() or self.dragging or self.resizing then
@@ -7990,33 +7997,60 @@ end
 -- Normal controls still keep the existing modal guard.
 function Window:_drawColorChip(c,right,cy,F,interactive,allowNested)
     local s=self.scale
-    local nominal=(F==REF.Compact)and REF.ColorChipCompact or REF.ColorChipFull
-    local sz=min(F.sw,nominal)*s
+    local sz=20*s
     local x=right-sz
     local y=cy-sz*.5
-    local rad=min(8*s,sz*.24)
+    local hov=self:_hit(x-3*s,y-3*s,sz+6*s,sz+6*s)
+    local hv=hov and 1 or 0
+    local card=self:_color("card")
+    local outlineCol=blend(self:_color("outline"),self:_color("accent"),hv*.22)
 
-    self:_fill("control",x,y,sz,sz,"control",rad)
-    rect(x+1*s,y+1*s,sz-2*s,sz-2*s,c.value,max(1,rad-1*s),c.value[4]or 255)
-    self:_out(x,y,sz,sz,rad,.9,self:_color("outline"),220)
+    rect(x,y,sz,sz,card,5*s,255)
+    self:_out(x,y,sz,sz,5*s,1,outlineCol,255)
+
+    local ix,iy,iw,ih=x+2*s,y+2*s,sz-4*s,sz-4*s
+    local tile=4*s
+    local cols=max(1,ceil(iw/tile))
+    local rows=max(1,ceil(ih/tile))
+    for yy=0,rows-1 do
+        for xx=0,cols-1 do
+            local tx=ix+xx*tile
+            local ty=iy+yy*tile
+            local tw=min(tile,ix+iw-tx)
+            local th=min(tile,iy+ih-ty)
+            if tw>0 and th>0 then
+                local cc=((xx+yy)%2==0)and{72,70,78,255}or{39,38,44,255}
+                rect(tx,ty,tw,th,cc,0,255)
+            end
+        end
+    end
+    rect(ix,iy,iw,ih,c.value,4*s,c.value[4]or 255)
 
     local sameColor=self.colorPopup and self.colorPopup.control==c
     local sameMenu=self.colorMenu and self.colorMenu.control==c
     local modalOK=allowNested==true or not self:_hasPopup()or sameColor or sameMenu
     if interactive and not self._consumed and modalOK then
-        if Input.click and self:_hit(x,y,sz,sz)then
+        if Input.click and hov then
             if sameColor then
                 self.colorPopup=nil
             else
-                self.colorPopup={control=c,x=x+sz-232*s,y=y+sz+6*s,w=232*s,h=238*s,triggerX=x,triggerY=y,triggerW=sz,triggerH=sz}
+                self.colorPopup={
+                    control=c,
+                    x=x,y=y,w=sz,h=sz,
+                    drag=nil,
+                    triggerX=x,triggerY=y,triggerW=sz,triggerH=sz
+                }
                 self.colorMenu=nil
             end
             self:_consume()
-        elseif Input.rightClick and self:_hit(x,y,sz,sz)then
+        elseif Input.rightClick and hov then
             if sameMenu then
                 self.colorMenu=nil
             else
-                self.colorMenu={control=c,x=Input.mx,y=Input.my,w=154*s,h=84*s,triggerX=x,triggerY=y,triggerW=sz,triggerH=sz}
+                self.colorMenu={
+                    control=c,x=Input.mx,y=Input.my,w=168*s,h=94*s,
+                    triggerX=x,triggerY=y,triggerW=sz,triggerH=sz
+                }
                 self.colorPopup=nil
             end
             self:_consume()
@@ -9127,89 +9161,175 @@ function Window:_drawColorPopup()
     if not p then return end
     local c=p.control
     if not alive(c)then self.colorPopup=nil return end
+
     local s=self.scale
-    p.w=232*s;p.h=238*s;p.anchorY=p.y-6*s
-    self:_clampPopup(p);self:_popupFrame(p)
+    local sw,sh=screenSize()
+    local w,h=278*s,286*s
+    local tx=p.triggerX or p.x or 8
+    local ty=p.triggerY or p.y or 8
+    local tw=p.triggerW or 20*s
+
+    local x=tx+tw+10*s
+    if x+w>sw-8 then x=tx-w-10*s end
+    x=clamp(x,8,max(8,sw-w-8))
+    local y=clamp(ty-14*s,8,max(8,sh-h-8))
+
+    p.x,p.y,p.w,p.h=x,y,w,h
 
     local arr=c.value
     local hue,sat,val=rgbToHsv92(arr[1],arr[2],arr[3])
-    local svx,svy,svw,svh=p.x+12*s,p.y+39*s,158*s,108*s
-    local hx,hy,hw,hh=p.x+181*s,p.y+39*s,16*s,108*s
-    local ax,ay,aw,ah=p.x+12*s,p.y+169*s,185*s,12*s
-    textC(upper(c.label or"COLOR"),p.x+12*s,p.y+17*s,self:_color("text"),13*s,"Verdana")
+    local main=self:_color("menuBg")
+    local card=self:_color("card")
+    local border=self:_color("outline")
+    local textCol=self:_color("text")
+    local dim=self:_color("muted")
+    local white=self:_color("white")
 
-    local P=Fawn.Performance
-    local cols=max(8,floor(P.ColorPickerCols or 14))
-    local rows=max(6,floor(P.ColorPickerRows or 10))
-    local hueSteps=max(12,floor(P.ColorPickerHueSteps or 24))
-    local alphaSteps=max(16,floor(P.ColorPickerAlphaSteps or 48))
-    local cw,ch=svw/cols,svh/rows
+    local svx,svy,svw,svh=x+14*s,y+52*s,202*s,138*s
+    local hx,hy,hw,hh=x+228*s,y+52*s,22*s,138*s
+    local ax,ay,aw,ah=x+14*s,y+218*s,236*s,16*s
 
-    for iy=0,rows-1 do
-        local vv=1-iy/max(1,rows-1)
-        for ix=0,cols-1 do
-            local ss=ix/max(1,cols-1)
-            local r,g,b=hsvToRgb92(hue,ss,vv)
-            rect(svx+ix*cw,svy+iy*ch,cw+1,ch+1,{r,g,b,255},0,255)
+    -- Original Fawn popup shell/header.
+    rect(x,y,w,h,main,11*s,252)
+    self:_out(x,y,w,h,11*s,1,border,235)
+    rect(x+1*s,y+1*s,w-2*s,40*s,card,10*s,245)
+    line(x+12*s,y+40*s,x+w-12*s,y+40*s,border,max(1,s),180)
+    text(c.label or"COLOR",x+14*s,y+15*s,textCol,13*s,"Verdana")
+
+    -- Original live preview in the header.
+    local pvx,pvy=x+w-72*s,y+11*s
+    local pvw,pvh=42*s,20*s
+    rect(pvx,pvy,pvw,pvh,card,6*s,255)
+    self:_out(pvx,pvy,pvw,pvh,6*s,1,border,255)
+    local pix,piy,piw,pih=pvx+3*s,pvy+3*s,pvw-6*s,pvh-6*s
+    local tile=4*s
+    for yy=0,max(0,ceil(pih/tile)-1)do
+        for xx=0,max(0,ceil(piw/tile)-1)do
+            local qx,qy=pix+xx*tile,piy+yy*tile
+            local qw,qh=min(tile,pix+piw-qx),min(tile,piy+pih-qy)
+            if qw>0 and qh>0 then
+                rect(qx,qy,qw,qh,((xx+yy)%2==0)and{72,70,78,255}or{39,38,44,255},0,255)
+            end
         end
     end
-    self:_out(svx-1*s,svy-1*s,svw+2*s,svh+2*s,4*s,.8,self:_color("outline"),210)
-    local sx,sy=svx+sat*svw,svy+(1-val)*svh
-    circle(sx,sy,3.2*s,self:_color("white"),255)
-    outline(sx-4.2*s,sy-4.2*s,8.4*s,8.4*s,self:_color("black"),4.2*s,190,max(.8,s))
+    rect(pix,piy,piw,pih,arr,4*s,arr[4]or 255)
 
-    for i=0,hueSteps-1 do
-        local r,g,b=hsvToRgb92(i/max(1,hueSteps-1),1,1)
-        rect(hx,hy+i*(hh/hueSteps),hw,hh/hueSteps+1,{r,g,b,255},0,255)
+    -- Close X, exactly like the original picker header.
+    local closeX,closeY=x+w-18*s,y+20*s
+    line(closeX-3*s,closeY-3*s,closeX+3*s,closeY+3*s,dim,max(1,s),255)
+    line(closeX+3*s,closeY-3*s,closeX-3*s,closeY+3*s,dim,max(1,s),255)
+
+    -- Original high-density SV field.
+    rect(svx-1*s,svy-1*s,svw+2*s,svh+2*s,card,6*s,255)
+    self:_out(svx-1*s,svy-1*s,svw+2*s,svh+2*s,6*s,1,border,210)
+    local isvx,isvy,isvw,isvh=svx+1*s,svy+1*s,svw-2*s,svh-2*s
+    local cols,rows=72,50
+    local cw,ch=isvw/cols,isvh/rows
+    for iy=0,rows-1 do
+        local vv=1-(iy/(rows-1))
+        for ix=0,cols-1 do
+            local ss=ix/(cols-1)
+            local r,g,b=hsvToRgb92(hue,ss,vv)
+            rect(isvx+ix*cw,isvy+iy*ch,cw+1.05*s,ch+1.05*s,{r,g,b,255},0,255)
+        end
     end
-    self:_out(hx-1*s,hy-1*s,hw+2*s,hh+2*s,3*s,.8,self:_color("outline"),210)
-    rect(hx-2*s,hy+hue*hh-1*s,hw+4*s,2*s,self:_color("white"),1*s,255)
+    local sx=isvx+sat*isvw
+    local sy=isvy+(1-val)*isvh
+    rect(sx-2*s,sy-2*s,4*s,4*s,white,2*s,255)
 
-    self:_fill("control",ax,ay,aw,ah,"control",4*s)
-    local segW=aw/alphaSteps
-    for i=0,alphaSteps-1 do
-        local aa=round(i/max(1,alphaSteps-1)*255)
-        rect(ax+i*segW,ay,segW+1,ah,{arr[1],arr[2],arr[3],255},0,aa)
+    -- Original full-height hue strip.
+    rect(hx-1*s,hy-1*s,hw+2*s,hh+2*s,card,6*s,255)
+    self:_out(hx-1*s,hy-1*s,hw+2*s,hh+2*s,6*s,1,border,210)
+    local ihx,ihy,ihw,ihh=hx+1*s,hy+1*s,hw-2*s,hh-2*s
+    local steps=138
+    local hs=ihh/steps
+    for i=0,steps-1 do
+        local r,g,b=hsvToRgb92(i/(steps-1),1,1)
+        rect(ihx,ihy+i*hs,ihw,hs+1.1*s,{r,g,b,255},0,255)
     end
-    self:_out(ax,ay,aw,ah,4*s,.8,self:_color("outline"),210)
-    local alphaX=ax+(arr[4]or 255)/255*aw
-    rect(alphaX-1*s,ay-1*s,2*s,ah+2*s,self:_color("white"),1*s,255)
+    rect(hx-2*s,ihy+hue*ihh-1*s,hw+4*s,2*s,white,1*s,255)
 
+    -- Original checkerboard transparency strip.
+    text("TRANSPARENCY",ax,ay-18*s,dim,13*s,"Verdana")
+    rect(ax,ay,aw,ah,card,6*s,255)
+    self:_out(ax,ay,aw,ah,6*s,1,border,255)
+    local iax,iay,iaw,iah=ax+2*s,ay+2*s,aw-4*s,ah-4*s
+    local checker=6*s
+    for yy=0,max(0,ceil(iah/checker)-1)do
+        for xx=0,max(0,ceil(iaw/checker)-1)do
+            local qx,qy=iax+xx*checker,iay+yy*checker
+            local qw,qh=min(checker,iax+iaw-qx),min(checker,iay+iah-qy)
+            if qw>0 and qh>0 then
+                rect(qx,qy,qw,qh,((xx+yy)%2==0)and{72,70,78,255}or{39,38,44,255},0,255)
+            end
+        end
+    end
+    local gax,gay,gaw,gah=iax+1*s,iay+1*s,iaw-2*s,iah-2*s
+    local pixels=max(1,floor(gaw))
+    for i=0,pixels-1 do
+        local aa=floor((i/max(1,pixels-1))*255+.5)
+        rect(gax+i,gay,1,gah,{arr[1],arr[2],arr[3],255},0,aa)
+    end
+    rect(iax+iaw-5*s,iay,5*s,iah,{arr[1],arr[2],arr[3],255},4*s,255)
+    local alphaX=gax+((arr[4]or 255)/255)*gaw
+    rect(alphaX-1*s,gay-1*s,2*s,gah+2*s,white,1*s,255)
+
+    -- Original hex / Alpha readouts.
     local hex=format("#%02X%02X%02X",arr[1],arr[2],arr[3])
-    local ap=round((arr[4]or 255)/255*100)
-    local fy=p.y+199*s
-    self:_fill("control",p.x+12*s,fy,88*s,23*s,"control",5*s)
-    self:_fill("control",p.x+109*s,fy,88*s,23*s,"control",5*s)
-    self:_out(p.x+12*s,fy,88*s,23*s,5*s,.7,self:_color("outline"),130)
-    self:_out(p.x+109*s,fy,88*s,23*s,5*s,.7,self:_color("outline"),130)
-    local tw=measure(hex,12*s,"Verdana");textC(hex,p.x+56*s-tw*.5,fy+11.5*s,self:_color("text"),12*s,"Verdana")
-    local at=tostring(ap).."%";tw=measure(at,12*s,"Verdana");textC(at,p.x+153*s-tw*.5,fy+11.5*s,self:_color("muted"),12*s,"Verdana")
+    local ap=floor(((arr[4]or 255)/255)*100+.5)
+    local bx1,by1,bw1,bh1=x+14*s,y+248*s,112*s,25*s
+    local bx2=x+138*s
+    rect(bx1,by1,bw1,bh1,card,6*s,255)
+    self:_out(bx1,by1,bw1,bh1,6*s,1,border,210)
+    local htw=measure(hex,13*s,"Verdana")
+    textC(hex,bx1+(bw1-htw)*.5,by1+bh1*.5,textCol,13*s,"Verdana")
+    rect(bx2,by1,bw1,bh1,card,6*s,255)
+    self:_out(bx2,by1,bw1,bh1,6*s,1,border,210)
+    local alphaText="Alpha "..tostring(ap).."%"
+    local atw=measure(alphaText,13*s,"Verdana")
+    textC(alphaText,bx2+(bw1-atw)*.5,by1+bh1*.5,dim,13*s,"Verdana")
 
-    local function applyDrag(kind)
+    local function apply(kind)
         local h0,s0,v0=rgbToHsv92(arr[1],arr[2],arr[3])
         local q=copy(arr)
         if kind=="sv"then
-            s0=clamp((Input.mx-svx)/svw,0,1)
-            v0=1-clamp((Input.my-svy)/svh,0,1)
+            s0=clamp((Input.mx-isvx)/isvw,0,1)
+            v0=1-clamp((Input.my-isvy)/isvh,0,1)
             q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
         elseif kind=="h"then
-            h0=clamp((Input.my-hy)/hh,0,1)
+            h0=clamp((Input.my-ihy)/ihh,0,1)
             q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
-        elseif kind=="a"then
-            q[4]=round(clamp((Input.mx-ax)/aw,0,1)*255)
+        else
+            q[4]=floor(clamp((Input.mx-gax)/gaw,0,1)*255+.5)
         end
         c:Set(q)
     end
 
+    -- Entire popup shell is modal. Any click/right-click inside is consumed so
+    -- nothing under the picker can be activated by the same pointer event.
     if Input.click and not self._consumed then
-        if self:_hit(svx,svy,svw,svh)then p.drag="sv";applyDrag("sv");self:_consume()
-        elseif self:_hit(hx,hy,hw,hh)then p.drag="h";applyDrag("h");self:_consume()
-        elseif self:_hit(ax,ay,aw,ah)then p.drag="a";applyDrag("a");self:_consume()end
+        if self:_hit(closeX-8*s,closeY-8*s,16*s,16*s)then
+            self.colorPopup=nil
+            self:_consume()
+            return
+        elseif self:_hit(isvx,isvy,isvw,isvh)then
+            p.drag="sv";apply("sv");self:_consume()
+        elseif self:_hit(ihx,ihy,ihw,ihh)then
+            p.drag="h";apply("h");self:_consume()
+        elseif self:_hit(gax,gay,gaw,gah)then
+            p.drag="a";apply("a");self:_consume()
+        elseif self:_hit(x,y,w,h)then
+            self:_consume()
+        end
+    elseif Input.rightClick and not self._consumed and self:_hit(x,y,w,h)then
+        self:_consume()
     end
+
     if p.drag then
-        if Input.left then applyDrag(p.drag)else p.drag=nil end
+        if Input.left then apply(p.drag)else p.drag=nil end
     end
 end
+
 
 -- Cleaner ESP preview ---------------------------------------------------------
 function ESPPreview:SetEnabled(v)self.visible=v~=false;return self end
@@ -9693,15 +9813,17 @@ function Window:_drawExtraPopup()
     end
 end
 
-Fawn.Version="10.0.6-serotonin"
-Fawn.APIRevision=46
-Fawn.BuildId="fawn-modern-10.0.6-stable-modal-images-20260917"
-Fawn.PolishVersion="10.0.6"
+Fawn.Version="10.0.7-serotonin"
+Fawn.APIRevision=47
+Fawn.BuildId="fawn-modern-10.0.7-original-colorpicker-20260917"
+Fawn.PolishVersion="10.0.7"
 Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
 Fawn.DynamicCapabilities.ProtectedNativeDraw=true
 Fawn.DynamicCapabilities.StrictDropdownChromeModal=true
 Fawn.DynamicCapabilities.RawManagedImageDraw=true
-Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; no shared page popup state; typed accessory sliders"
+Fawn.DynamicCapabilities.OriginalFawnColorPicker=true
+Fawn.DynamicCapabilities.StrictColorPickerModal=true
+Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; original Fawn color picker; typed accessory sliders"
 Fawn:SetPerformanceMode("Peak")
 
 Fawn.DynamicCapabilities.PopupPointerIsolation=true
@@ -9714,7 +9836,7 @@ Fawn.DynamicCapabilities.ReusedControlRects=true
 Fawn.Runtime.AccessoryPopupFinal="exclusive popup-layer pointer routing; nested dropdown/color/key children; left/right-click numeric slider editor"
 Fawn.Runtime.ESPPreview="clean corner-box preview; optional visibility; draggable slot widgets with stable release commit"
 Fawn.Runtime.ManagedImages="raw 5-argument draw.Image first; neutral-white fallback only; no theme/glass tint path"
-Fawn.Runtime.Performance="Peak: protected native drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + cached text/colors + reduced color-picker/snow budgets"
+Fawn.Runtime.Performance="Peak: protected native drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + cached text/colors; original high-density color picker cost exists only while a picker is open"
 
 end
 
