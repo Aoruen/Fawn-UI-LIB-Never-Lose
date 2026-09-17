@@ -1,4 +1,3 @@
--- Fawn Modern | Canonical Serotonin build
 local Fawn={
     ProductName="Fawn Modern",
     DisplayName="Fawn Modern",
@@ -973,13 +972,16 @@ if not ok or type(data)~="string"or data==""then return nil end
 if ok2 and type(id)=="number"then return id end
 return nil
 end
+local IMAGE_WHITE=Color3.fromRGB(255,255,255)
 local function drawImage(id,x,y,w,h,a)
-    if type(id)~="number"or type(draw.Image)~="function"then return false end
-    local aa=clamp(round((a==nil and 1 or a)*255),0,255)
-local ok,err=pcall(draw.Image,id,x,y,w,h,255,255,255,aa)
-if not ok then E.drawErrors=E.drawErrors+1
-E.lastDrawError=tostring(err)end
-return ok
+    if type(id)~="number"then return false end
+    local fn=draw and(draw.Image or draw.image)
+    if type(fn)~="function"then return false end
+    if type(x)~="number"or type(y)~="number"or type(w)~="number"or type(h)~="number"or w<=0 or h<=0 then return false end
+    local aa=clamp(tonumber(a)or 1,0,1)
+    local ok,err=pcall(fn,id,floor(x+.5),floor(y+.5),max(1,floor(w+.5)),max(1,floor(h+.5)),IMAGE_WHITE,aa)
+    if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
+    return ok
 end
 
 function Fawn:CreateWindow(opt)
@@ -5191,12 +5193,17 @@ function ESPPreview:_drawBody(x,y,w,h,docked)
     add("name",self.texts.name or"Player",self.colors.name or self:_theme("text"));if self.features.healthtext or self.healthStyle=="text"or self.healthStyle=="both"then self.features.healthtext=true;add("healthtext","HP: "..tostring(round(health)),hpCol)end;add("distance",self.texts.distance or"42m",self.colors.distance or self:_theme("muted"))
     for slot,list in pairs(groups)do sort(list,function(a,b)return(self.order[a.kind]or 99)<(self.order[b.kind]or 99)end);local ax,ay,row,col=slotInfo92(slot,bx,by,humanW,humanH,12*s);local lineH=18*s;local maxW=0;for _,it in ipairs(list)do maxW=max(maxW,measure(it.text,13*s,"Verdana"))end;local total=#list*lineH;local sx=col==1 and(ax-8*s-maxW)or(col==2 and(ax-maxW*.5)or ax+8*s);local sy=row==1 and(ay-8*s-total)or(row==2 and(ay-total*.5)or ay+8*s);for i,it in ipairs(list)do local tw=measure(it.text,13*s,"Verdana");local tx=col==1 and(sx+maxW-tw)or(col==2 and(sx+(maxW-tw)*.5)or sx);local ty=sy+(i-1)*lineH;text(it.text,tx,ty,it.col,13*s,"Verdana");hit(it.kind,tx-4*s,ty-3*s,tw+8*s,18*s)end end
     if self.features.snapline then line(stageX+stageW*.5,stageY+stageH,bx+humanW*.5,by+humanH,self.colors.snapline or self:_theme("accent"),1*s,200)end
-    if self.editable and not self._espDrag and Input.click and(not win or not win._consumed)then for i=#hits,1,-1 do local q=hits[i];if self:_hitESP(Input.mx,Input.my,q.x,q.y,q.w,q.h)then self._espDrag=q.kind;if win then win:_consume()end;break end end end
+    -- ESP element drag has first pointer ownership. Start from held-left as well as click so
+    -- runtimes that consume the click edge earlier in the Window pass still drag correctly.
+    if self.editable and not self._espDrag and Input.left and(not win or not win._hasPopup or not win:_hasPopup())then
+        for i=#hits,1,-1 do local q=hits[i];if self:_hitESP(Input.mx,Input.my,q.x,q.y,q.w,q.h)then self._espDrag=q.kind;self._espDragStarted=true;E.pointerConsumed=true;if win then win._consumed=true end;break end end
+    end
     if self._espDrag then
+        E.pointerConsumed=true;if win then win._consumed=true end
         local kind=self._espDrag;local near=nearestSlot92(Input.mx,Input.my,bx,by,humanW,humanH,kind=="healthbar")
         for _,slot in ipairs(kind=="healthbar"and{2,4,6,8}or{1,2,3,4,6,7,8,9})do local ax,ay=slotInfo92(slot,bx,by,humanW,humanH,12*s);local active=slot==near;circle(ax,ay,(active and 4 or 2.5)*s,active and self:_theme("accent")or self:_theme("muted"),active and 255 or 180)end
         if kind=="healthbar"then drawHealth(near,true)else local label=kind=="name"and(self.texts.name or"Player")or(kind=="distance"and(self.texts.distance or"42m")or("HP: "..tostring(round(health))));local col=kind=="name"and(self.colors.name or self:_theme("text"))or(kind=="distance"and(self.colors.distance or self:_theme("muted"))or hpCol);local tw=measure(label,13*s,"Verdana");text(label,Input.mx-tw*.5,Input.my-7*s,col,13*s,"Verdana")end
-        if not Input.left then espReorder92(self,kind,near,Input.my,bx,by,humanW,humanH);self.positions[kind]=near;self._espDrag=nil end
+        if not Input.left then espReorder92(self,kind,near,Input.my,bx,by,humanW,humanH);self.positions[kind]=near;self._espDrag=nil;self._espDragStarted=nil end
     end
 end
 
@@ -6076,11 +6083,19 @@ Fawn.Runtime.Outline97="window/Section/popup/overlay strokes share scale-aware i
 Fawn.Runtime.WidgetHitboxes97="plain text rows never consume pointer input; switches/fields/buttons/pickers only"
 
 -- Runtime registration
+-- Loading Fawn again in the same Serotonin session deactivates the previous callback set.
+local runtimeToken={active=true}
+do
+    local g=type(_G)=="table"and _G or nil
+    if g then local old=rawget(g,"__FAWN_MODERN_RUNTIME");if type(old)=="table"then old.active=false end;g.__FAWN_MODERN_RUNTIME=runtimeToken end
+end
 local function updateEvent()
+    if not runtimeToken.active then return end
     local ok,err=pcall(pollInput)
 if not ok then E.lastInputError=tostring(err)end
 end
 local function paintEvent()
+    if not runtimeToken.active then return end
     beginPaintInput();E.paintCount=E.paintCount+1;E.pointerConsumed=false
     local raw={click=Input.click,rightClick=Input.rightClick,left=Input.left,right=Input.right,released=Input.released,rightReleased=Input.rightReleased,wheel=Input.wheel}
     local function protected(fn,obj)local ok,err=pcall(fn,obj);if not ok then E.paintErrors=E.paintErrors+1;E.lastPaintError=tostring(err)end end
@@ -6128,10 +6143,11 @@ local updateOK=registerEvent("onUpdate",updateEvent)
 if not updateOK then updateOK=registerEvent("update",updateEvent)end
 local paintOK=registerEvent("onPaint",paintEvent)
 if not paintOK then paintOK=registerEvent("paint",paintEvent)end
+registerEvent("shutdown",function()runtimeToken.active=false end)
 if not updateOK then -- fallback keeps normal controls usable on runtimes without onUpdate
     registerEvent("onPaint",function()updateEvent()end)
 end
-Fawn.Runtime={InputEvent=updateOK and"onUpdate"or"onPaint fallback",PaintEvent=paintOK and"onPaint"or"paint",Font="Verdana",Reference="Fawn Modern reference geometry + Fawn behavioral contract",Renderer="unified shell + modal pointer routing + managed storage + preset settings",NoFakeShadows=true,SolidOutline=true,CorrectDrawImageSignature="textureId,x,y,w,h,r,g,b,a",ContainerScrolling="reserved section/page gutters + nested ownership + hover/drag accent feedback",Resize="deferred mouse-anchored UI scale + frozen screen-space physical resize",ESPWidgets="original Fawn cursor-follow drag parity + 8-slot commit + stacking reorder, reset and shuffle tools",ColorPicker="original Fawn HSV/SV + hue + alpha picker with color clipboard",Input="original Fawn caret-aware single-line text input with horizontal text window",DropdownScroll="fractional visual interpolation + numeric drag geometry + dedicated gutter",AccessoryPopup="extensible embedded-keybind three-dot popup",KeybindMode="original Fawn: left-click armed capture; Backspace clears; right-click Hold/Toggle/Always On; settings toggle key works while preserving edit isolation",Outline="single solid outer outline + inset rounded strokes",ContainerSeparation="stable gutters + no implicit column splits + responsive wrap geometry"}
+Fawn.Runtime={InputEvent=updateOK and"onUpdate"or"onPaint fallback",PaintEvent=paintOK and"onPaint"or"paint",Font="Verdana",Reference="Fawn Modern reference geometry + Fawn behavioral contract",Renderer="unified shell + modal pointer routing + managed storage + preset settings",NoFakeShadows=true,SolidOutline=true,CorrectDrawImageSignature="textureId,x,y,w,h,Color3,alpha",ContainerScrolling="reserved section/page gutters + nested ownership + hover/drag accent feedback",Resize="deferred mouse-anchored UI scale + frozen screen-space physical resize",ESPWidgets="original Fawn cursor-follow drag parity + 8-slot commit + stacking reorder, reset and shuffle tools",ColorPicker="original Fawn HSV/SV + hue + alpha picker with color clipboard",Input="original Fawn caret-aware single-line text input with horizontal text window",DropdownScroll="fractional visual interpolation + numeric drag geometry + dedicated gutter",AccessoryPopup="extensible embedded-keybind three-dot popup",KeybindMode="original Fawn: left-click armed capture; Backspace clears; right-click Hold/Toggle/Always On; settings toggle key works while preserving edit isolation",Outline="single solid outer outline + inset rounded strokes",ContainerSeparation="stable gutters + no implicit column splits + responsive wrap geometry"}
 
 
 -- 9.8 integrated finishing layer ---------------------------------------------------
@@ -7266,7 +7282,7 @@ local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class miss
 local SettingsPage=assert(Fawn.Classes and Fawn.Classes.SettingsPage,"Fawn SettingsPage class missing")
 local ROOT="Fawn Modern"
 local PATHS={Root=ROOT,Configs=ROOT.."/configs",ProfilePictures=ROOT.."/Profile Pictures",LogoPictures=ROOT.."/logo pictures"}
-local IMG_EXT={png=true,jpg=true,jpeg=true,bmp=true,webp=true}
+local IMG_EXT={png=true,jpg=true,jpeg=true}
 local CFG_EXT={lua=true,cfg=true,txt=true,json=true}
 local managedTextures={}
 
@@ -7324,17 +7340,35 @@ local function configPathFinal(name)
     if name:find("/",1,true)then return name end
     return PATHS.Configs.."/"..name
 end
+local imageErrors={}
+local MAX_IMAGE_BYTES=8*1024*1024
+local function imageBytesValid(data)
+    if type(data)~="string"or #data<4 then return false,"empty image" end
+    if #data>MAX_IMAGE_BYTES then return false,"image is larger than 8 MB" end
+    local b1,b2,b3,b4=data:byte(1,4)
+    local png=b1==137 and b2==80 and b3==78 and b4==71
+    local jpg=b1==255 and b2==216 and b3==255
+    if not png and not jpg then return false,"only PNG/JPG images are supported" end
+    return true
+end
 local function loadManaged(path,force)
     path=tostring(path or"")
-    if path==""then return nil end
-    if not force and managedTextures[path]~=nil then return managedTextures[path]or nil end
-    local f=fsFinal();if not f then managedTextures[path]=false;return nil end
-    local reader=f.read or f.Read;if type(reader)~="function"then managedTextures[path]=false;return nil end
-    local ok,data=pcall(reader,path);if not ok or type(data)~="string"or data==""then managedTextures[path]=false;return nil end
-    local loader=(utility and(utility.LoadImage or utility.loadImage))or(image and(image.load or image.Load))
-    if type(loader)~="function"then managedTextures[path]=false;return nil end
-    local ok2,id=pcall(loader,data);if ok2 and(type(id)=="number"or type(id)=="userdata")then managedTextures[path]=id;return id end
-    managedTextures[path]=false;return nil
+    if path==""then return nil,"empty path" end
+    if not force and managedTextures[path]~=nil then
+        local cached=managedTextures[path]
+        return cached or nil,cached and nil or(imageErrors[path]or"image load failed")
+    end
+    managedTextures[path]=nil;imageErrors[path]=nil
+    local f=fsFinal();if not f or type(f.read)~="function"then imageErrors[path]="file.read unavailable";return nil,imageErrors[path] end
+    local ok,data=pcall(f.read,path)
+    if not ok or type(data)~="string"or data==""then imageErrors[path]="could not read "..path;managedTextures[path]=false;return nil,imageErrors[path] end
+    local valid,why=imageBytesValid(data);if not valid then imageErrors[path]=why;managedTextures[path]=false;return nil,why end
+    local loader=utility and utility.LoadImage
+    if type(loader)~="function"then imageErrors[path]="utility.LoadImage unavailable";managedTextures[path]=false;return nil,imageErrors[path] end
+    local ok2,id=pcall(loader,data)
+    if ok2 and type(id)=="number"and id>0 then managedTextures[path]=id;return id end
+    imageErrors[path]=ok2 and"utility.LoadImage returned no texture"or tostring(id)
+    managedTextures[path]=false;return nil,imageErrors[path]
 end
 
 Fawn.StoragePaths={Root=ROOT,Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}
@@ -7348,39 +7382,44 @@ function Fawn:GetStorageDisplayPaths()
 end
 function Fawn:ListStorage(kind)return listFinal(kind)end
 function Fawn:ResolveStoragePath(kind,name)return resolveFinal(kind,name)end
-function Fawn:ClearImageCache(path)if path then managedTextures[tostring(path)]=nil else managedTextures={}end return self end
+function Fawn:ClearImageCache(path)
+    if path then path=tostring(path);managedTextures[path]=nil;imageErrors[path]=nil else managedTextures={};imageErrors={} end
+    return self
+end
+function Fawn:GetImageError(path)return imageErrors[tostring(path or"")]end
+-- Kept for compatibility, but intentionally does nothing unless force=true.
+-- Image decoding is never done automatically at library load because LoadImage allocates native textures.
 function Fawn:PreloadStorageImages(force)
+    if force~=true then return self end
     ensureFinal()
-    for _,kind in ipairs({"ProfilePictures","LogoPictures"})do for _,name in ipairs(listFinal(kind))do loadManaged(resolveFinal(kind,name),force==true)end end
+    local loaded=0
+    for _,kind in ipairs({"ProfilePictures","LogoPictures"})do
+        for _,name in ipairs(listFinal(kind))do
+            if loaded>=16 then return self end
+            loadManaged(resolveFinal(kind,name),false);loaded=loaded+1
+        end
+    end
     return self
 end
 ensureFinal()
-Fawn:PreloadStorageImages(false)
 
-function Window:SetProfileImage(v)
-    if type(v)=="number"or type(v)=="userdata"then self.profileImage=v;self.profileImagePath=nil;return self end
-    local path=type(v)=="string"and resolveFinal("ProfilePictures",v)or""
-    self.profileImagePath=path~=""and path or nil;self.profileImage=path~=""and loadManaged(path,false)or nil;self._profileImageRetry=0
-    return self
+local function applyManagedImage(self,field,pathField,retryField,kind,v,force)
+    if type(v)=="number"and v>0 then self[field]=v;self[pathField]=nil;self[retryField]=nil;return true end
+    if type(v)~="string"or v==""or v:sub(1,1)=="(" then self[field]=nil;self[pathField]=nil;self[retryField]=nil;return false,"no image selected" end
+    local path=resolveFinal(kind,v);self[pathField]=path;self[retryField]=nil
+    if force then managedTextures[path]=nil;imageErrors[path]=nil end
+    local tex,err=loadManaged(path,force==true);self[field]=tex
+    return tex~=nil,err
 end
+function Window:SetProfileImage(v,force)local ok=applyManagedImage(self,"profileImage","profileImagePath","_profileImageRetry","ProfilePictures",v,force);return self,ok end
+function Window:ApplyProfileImage(v)local ok,err=applyManagedImage(self,"profileImage","profileImagePath","_profileImageRetry","ProfilePictures",v,true);return ok,err end
 function Window:ClearProfileImage()self.profileImage=nil;self.profileImagePath=nil;self._profileImageRetry=nil;return self end
-function Window:SetLogoImage(v)
-    if type(v)=="number"or type(v)=="userdata"then self.logoImage=v;self.logoImagePath=nil;return self end
-    local path=type(v)=="string"and resolveFinal("LogoPictures",v)or""
-    self.logoImagePath=path~=""and path or nil;self.logoImage=path~=""and loadManaged(path,false)or nil;self._logoImageRetry=0
-    return self
-end
+function Window:SetLogoImage(v,force)local ok=applyManagedImage(self,"logoImage","logoImagePath","_logoImageRetry","LogoPictures",v,force);return self,ok end
+function Window:ApplyLogoImage(v)local ok,err=applyManagedImage(self,"logoImage","logoImagePath","_logoImageRetry","LogoPictures",v,true);return ok,err end
 function Window:ClearLogoImage()self.logoImage=nil;self.logoImagePath=nil;self._logoImageRetry=nil;return self end
 
--- If an image was copied into the managed folder after startup, retry a failed cached load
--- without requiring a script reload.
-local renderImagesFinal=Window._render
-function Window:_render(...)
-    local n=nowMs()
-    if self.profileImagePath and not self.profileImage and n>=(self._profileImageRetry or 0)then managedTextures[self.profileImagePath]=nil;self.profileImage=loadManaged(self.profileImagePath,true);self._profileImageRetry=n+350 end
-    if self.logoImagePath and not self.logoImage and n>=(self._logoImageRetry or 0)then managedTextures[self.logoImagePath]=nil;self.logoImage=loadManaged(self.logoImagePath,true);self._logoImageRetry=n+350 end
-    return renderImagesFinal(self,...)
-end
+-- No per-frame image decoding. Failed assets stay failed until Apply/Refresh is requested.
+
 
 -- The profile popup is fully authorable but has no build/version action.
 local setProfileFinal=Window.SetProfileMenu
@@ -7492,13 +7531,15 @@ function Fawn:CreateSettingsPage(window,opt)
     page.Controls.ProfileSub=profile:Input("Subtitle",window.profileSubtitle,{placeholder="Developer",noConfig=true});page.Controls.ProfileSub:OnChanged(function(v)window:SetProfileSubtitle(v)end)
     profile:AddSeparator("PROFILE PICTURE")
     local function imageOpts(kind,empty)local q=listFinal(kind);if #q==0 then return{empty}end return q end
-    page.Controls.ProfileBrowser=profile:Dropdown("Profile Picture",imageOpts("ProfilePictures","(no profile pictures)"),1,{noConfig=true});page.Controls.ProfileBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then window:SetProfileImage(v)end end)
-    profile:AddButtonPair("Refresh Pictures",function()Fawn:ClearImageCache();Fawn:PreloadStorageImages(true);page:RefreshBrowsers()end,"Clear Avatar",function()window:ClearProfileImage()end)
+    page.Controls.ProfileBrowser=profile:Dropdown("Profile Picture",imageOpts("ProfilePictures","(no profile pictures)"),1,{noConfig=true})
+    profile:AddButtonPair("Apply Picture",function()local v=page.Controls.ProfileBrowser:Get();local ok,err=window:ApplyProfileImage(v);window:Notify(ok and("Applied "..tostring(v))or("Picture failed: "..tostring(err or"unknown error")),{title="PROFILE PICTURE",duration=4})end,"Clear Avatar",function()window:ClearProfileImage()end)
+    profile:AddButton("Refresh Pictures",function()page:RefreshBrowsers()end)
     profile:AddSeparator("BRAND & LOGO")
     page.Controls.Brand=profile:Input("Brand Title",window.brand,{noConfig=true});page.Controls.Brand:OnChanged(function(v)window.brand=v end)
     page.Controls.Subtitle=profile:Input("Brand Subtitle",window.subtitle,{noConfig=true});page.Controls.Subtitle:OnChanged(function(v)window.subtitle=v end)
-    page.Controls.LogoBrowser=profile:Dropdown("Logo Picture",imageOpts("LogoPictures","(no logo pictures)"),1,{noConfig=true});page.Controls.LogoBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then window:SetLogoImage(v)end end)
-    profile:AddButtonPair("Refresh Logos",function()Fawn:ClearImageCache();Fawn:PreloadStorageImages(true);page:RefreshBrowsers()end,"Clear Logo",function()window:ClearLogoImage()end)
+    page.Controls.LogoBrowser=profile:Dropdown("Logo Picture",imageOpts("LogoPictures","(no logo pictures)"),1,{noConfig=true})
+    profile:AddButtonPair("Apply Logo",function()local v=page.Controls.LogoBrowser:Get();local ok,err=window:ApplyLogoImage(v);window:Notify(ok and("Applied "..tostring(v))or("Logo failed: "..tostring(err or"unknown error")),{title="LOGO",duration=4})end,"Clear Logo",function()window:ClearLogoImage()end)
+    profile:AddButton("Refresh Logos",function()page:RefreshBrowsers()end)
 
     local cfgs=listFinal("Configs");if #cfgs==0 then cfgs={"(no config files)"}end
     page.Controls.ConfigBrowser=config:Dropdown("Config File",cfgs,1,{noConfig=true});page.Controls.ConfigBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then page:SetConfigPath(v)end end)
@@ -7514,7 +7555,6 @@ function Fawn:CreateSettingsPage(window,opt)
     diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Modern settings and secondary UI test.",{title="DIAGNOSTICS"})end,{controlColumn=2})
 
     function page:RefreshBrowsers()
-        Fawn:PreloadStorageImages(false)
         local function apply(ctrl,list,empty)local q=list;if #q==0 then q={empty}end;if ctrl then ctrl:SetOptions(q,{preserve="text"})end end
         apply(self.Controls.ConfigBrowser,listFinal("Configs"),"(no config files)")
         apply(self.Controls.ProfileBrowser,listFinal("ProfilePictures"),"(no profile pictures)")
@@ -7560,4 +7600,3 @@ Fawn.Runtime.StorageRoot=ROOT;Fawn.Runtime.StoragePaths=Fawn:GetStoragePaths();F
 end
 
 return Fawn
- 
