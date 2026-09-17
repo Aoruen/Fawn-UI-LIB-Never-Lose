@@ -232,11 +232,18 @@ if fn and fn>=1 and fn<=12 then k=0x6F+fn end end end
 end
 local function mouseDown(which)
     local names=which==1 and{"left","leftmouse",1}or{"right","rightmouse",2}
-    if type(mouse.IsClicked)=="function"then for _,n in ipairs(names)do local ok,v=pcall(mouse.IsClicked,n)
-if ok and v==true then return true end end end
     if type(mouse.IsPressed)=="function"then for _,n in ipairs(names)do local ok,v=pcall(mouse.IsPressed,n)
 if ok and v==true then return true end end end
-    return keyState(which==1 and 1 or 2)
+    local keys=which==1 and{1,"leftmouse","lbutton","mouse1"}or{2,"rightmouse","rbutton","mouse2"}
+    for _,n in ipairs(keys)do if keyState(n)then return true end end
+    return false
+end
+local function mouseClicked(which)
+    if type(mouse.IsClicked)~="function"then return false end
+    local names=which==1 and{"left","leftmouse",1}or{"right","rightmouse",2}
+    for _,n in ipairs(names)do local ok,v=pcall(mouse.IsClicked,n)
+if ok and v==true then return true end end
+    return false
 end
 local WHEEL_UP={"wheelup","wheel_up","mousewheelup","mwheelup","scrollup"}
 local WHEEL_DOWN={"wheeldown","wheel_down","mousewheeldown","mwheeldown","scrolldown"}
@@ -256,9 +263,9 @@ if ok and type(p)=="table"then Input.mx=tonumber(p[1])or Input.mx
 Input.my=tonumber(p[2])or Input.my end
     local l=mouseDown(1)
 local r=mouseDown(2)
-    if l and not prevLeft then Input._clickQ=true end
+    if mouseClicked(1)or(l and not prevLeft)then Input._clickQ=true end
 if prevLeft and not l then Input._releaseQ=true end
-if r and not prevRight then Input._rightClickQ=true end
+if mouseClicked(2)or(r and not prevRight)then Input._rightClickQ=true end
 if prevRight and not r then Input._rightReleaseQ=true end
     Input.left,Input.right=l,r
 prevLeft,prevRight=l,r
@@ -979,8 +986,11 @@ local function drawImage(id,x,y,w,h,a)
     local fn=draw and(draw.Image or draw.image)
     if type(fn)~="function"then return false end
     if type(x)~="number"or type(y)~="number"or type(w)~="number"or type(h)~="number"or w<=0 or h<=0 then return false end
+    x,y,w,h=floor(x+.5),floor(y+.5),max(1,floor(w+.5)),max(1,floor(h+.5))
     local aa=clamp(tonumber(a)or 1,0,1)
-    local ok,err=pcall(fn,id,floor(x+.5),floor(y+.5),max(1,floor(w+.5)),max(1,floor(h+.5)),IMAGE_WHITE,aa)
+    local ok,err
+    if aa>=.999 then ok,err=pcall(fn,id,x,y,w,h)end
+    if not ok then ok,err=pcall(fn,id,x,y,w,h,IMAGE_WHITE,aa)end
     if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
     return ok
 end
@@ -5196,7 +5206,7 @@ function ESPPreview:_drawBody(x,y,w,h,docked)
     if self.features.snapline then line(stageX+stageW*.5,stageY+stageH,bx+humanW*.5,by+humanH,self.colors.snapline or self:_theme("accent"),1*s,200)end
     -- ESP element drag has first pointer ownership. Start from held-left as well as click so
     -- runtimes that consume the click edge earlier in the Window pass still drag correctly.
-    if self.editable and not self._espDrag and Input.left and(not win or not win._hasPopup or not win:_hasPopup())then
+    if self.editable and not self._espDrag and(Input.click or Input.left)and(not win or not win._hasPopup or not win:_hasPopup())then
         for i=#hits,1,-1 do local q=hits[i];if self:_hitESP(Input.mx,Input.my,q.x,q.y,q.w,q.h)then self._espDrag=q.kind;self._espDragStarted=true;E.pointerConsumed=true;if win then win._consumed=true end;break end end
     end
     if self._espDrag then
@@ -5958,7 +5968,12 @@ local function hasModal97(w)return alive(w)and w.visible~=false and w:_hasPopup(
 local function windowActiveCapture97(w)
     if not alive(w)then return false end
     if w.captureBind or w.dragging or w.resizing or w.activeSlider or w._sidebarDrag then return true end
-    local tab=w.activeTab;if tab and tab._pageDrag then return true end
+    local tab=w.activeTab
+    if tab then
+        if tab._pageDrag then return true end
+        local dp=tab.dockedPreview
+        if alive(dp)and(dp._espDrag or dp._dragElement)then return true end
+    end
     if w.openDrop and w.openDrop.drag then return true end;if w.colorPopup and w.colorPopup.drag then return true end
     for _,t in ipairs(w.tabs or{})do for _,sec in ipairs(t.sections or{})do if sec._scrollDrag then return true end end end
     return false
@@ -7288,7 +7303,13 @@ local CFG_EXT={lua=true,cfg=true,txt=true,json=true}
 local managedTextures={}
 
 local function fsFinal()return type(file)=="table"and file or nil end
-local function basenameFinal(p)p=tostring(p or""):gsub("\\","/"):gsub("/+$","");return p:match("([^/]+)$")or p end
+local function normalizeSandboxFinal(p)
+    local s=tostring(p or""):gsub("^%s+",""):gsub("%s+$",""):gsub("\\","/"):gsub('^"',""):gsub('"$',""):gsub("/+","/")
+    local l=lower(s);local marker="/serotonin/files/";local at=l:find(marker,1,true)
+    if at then s=s:sub(at+#marker)elseif l:sub(1,6)=="files/"then s=s:sub(7)elseif l=="files"then s=""end
+    return s:gsub("^/+",""):gsub("/+$","")
+end
+local function basenameFinal(p)p=normalizeSandboxFinal(p);return p:match("([^/]+)$")or p end
 local function extFinal(p)return lower((tostring(p or""):match("%.([^%./\\]+)$")or""))end
 local function mkdirFinal(path)
     local f=fsFinal();if not f then return false end
@@ -7319,7 +7340,7 @@ local function listFinal(kind)
     if kind=="Profiles"or kind=="Profile"then kind="ProfilePictures"elseif kind=="Logos"or kind=="Logo"then kind="LogoPictures"end
     local path=PATHS[kind]or ROOT;local f=fsFinal();if not f then return{}end
     local raw
-    for _,n in ipairs({"list","List","listdir","ListDir","ListDirectory","listFiles","ListFiles","listfiles","GetFiles","getFiles","getfiles"})do
+    for _,n in ipairs({"listdir","ListDir","ListDirectory","list","List","listFiles","ListFiles","listfiles","GetFiles","getFiles","getfiles"})do
         if type(f[n])=="function"then local ok,r=pcall(f[n],path);if ok and(type(r)=="table"or type(r)=="string")then raw=r;break end end
     end
     local src=normalizeFinal(raw);local out={}
@@ -7327,11 +7348,15 @@ local function listFinal(kind)
     return out
 end
 local function resolveFinal(kind,name)
-    name=tostring(name or""):gsub("\\","/")
+    name=normalizeSandboxFinal(name)
     if name==""then return""end
-    if name:sub(1,#ROOT)==ROOT then return name end
-    local base=PATHS[kind]or ROOT
-    if name:find("/",1,true)then return name end
+    local base=PATHS[kind]or ROOT;local ln=lower(name);local lr=lower(ROOT)
+    if ln==lr or ln:sub(1,#lr+1)==lr.."/"then return name end
+    local lb=lower(base);if ln==lb or ln:sub(1,#lb+1)==lb.."/"then return name end
+    if name:find("/",1,true)then
+        if ln:sub(1,17)=="profile pictures/"or ln:sub(1,14)=="logo pictures/"or ln:sub(1,8)=="configs/"then return ROOT.."/"..name end
+        return name
+    end
     return base.."/"..name
 end
 local function configPathFinal(name)
@@ -7598,6 +7623,168 @@ Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.ManagedStorage=true;Fawn.DynamicCapabilities.PresetSettingsMenu=true;Fawn.DynamicCapabilities.ProfileMenuAuthoring=true;Fawn.DynamicCapabilities.StableSectionClipping=true;Fawn.DynamicCapabilities.StableToggleAnimation=true
 Fawn.Runtime=Fawn.Runtime or{}
 Fawn.Runtime.StorageRoot=ROOT;Fawn.Runtime.StoragePaths=Fawn:GetStoragePaths();Fawn.Runtime.PresetSettings="profile-popup or sidebar-mounted reusable Settings";Fawn.Runtime.SectionScrolling="pixel-snapped vertical full-row clipping + rounded visible slice";Fawn.Runtime.ToggleAnimation="stable control identity while scrolling"
+end
+
+
+-- Final interaction / secondary-window / managed-image hotfix.
+do
+local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
+
+-- Small Neverlose-style windows keep authored sections inside the shell. Narrow content
+-- automatically reflows instead of allowing columns to overlap each other.
+local buildResponsiveBase=Window._buildLayout
+function Window:_buildLayout(tab)
+    local authored=max(1,floor(tonumber(self.columns)or 1))
+    local panel=self.kind=="Panel"or self.tabBarVisible==false
+    local logical=max(1,panel and(self.width-36)or(self.width-REF.ContentX-REF.RightMargin))
+    local minColumn=285
+    local responsive=clamp(floor((logical+REF.ColumnGap)/(minColumn+REF.ColumnGap)),1,authored)
+    if responsive>=authored or not tab then return buildResponsiveBase(self,tab)end
+
+    local items={}
+    for i,sec in ipairs(tab.sections or{})do
+        if alive(sec)and visibilityPass(sec)then items[#items+1]={sec=sec,i=i,row=sec.row or 1,col=sec.column or 1,span=sec.span or 1}end
+    end
+    sort(items,function(a,b)if a.row==b.row then if a.col==b.col then return a.i<b.i end return a.col<b.col end return a.row<b.row end)
+
+    local saved={};local row,col=1,1
+    for _,q in ipairs(items)do
+        local sec=q.sec;saved[#saved+1]={sec=sec,row=sec.row,column=sec.column,span=sec.span}
+        local full=(tonumber(q.span)or 1)>=authored
+        if full then
+            if col~=1 then row=row+1;col=1 end
+            sec.row,sec.column,sec.span=row,1,responsive;row=row+1
+        else
+            sec.row,sec.column,sec.span=row,col,1
+            col=col+1;if col>responsive then col=1;row=row+1 end
+        end
+    end
+
+    local oldColumns=self.columns;self.columns=responsive
+    local ok,result=pcall(buildResponsiveBase,self,tab)
+    self.columns=oldColumns
+    for _,q in ipairs(saved)do q.sec.row,q.sec.column,q.sec.span=q.row,q.column,q.span end
+    if not ok then error(result)end
+    if type(result)=="table"then result.responsiveColumns=responsive end
+    return result
+end
+
+-- The former fixed 250px config control could extend past a secondary window. This version
+-- progressively compacts Save / Config / Group / Search without drawing outside the content inset.
+function Window:_drawTopbar()
+    local s=self.scale;local X,Y=self.x,self.y
+    local left=X+REF.ContentX*s;local right=X+(self.width-REF.RightMargin)*s
+    local top=Y+20*s;local h=50*s;local avail=max(0,right-left)
+    if avail<60*s then return end
+    local gap=7*s
+
+    local function saveBox(x,w)
+        local hov=self:_hit(x,top,w,h)and not self:_hasPopup()
+        self:_fill("control",x,top,w,h,hov and"controlHover"or"card",12*s);self:_out(x,top,w,h,12*s,.8,self:_color("outline"),105)
+        self:_icon("save",x+w*.5,top+h*.5,min(21*s,w*.46),"text")
+        if Input.click and not self._consumed and not self:_hasPopup()and hov then self:SaveNamedConfig(self.configName);self:Notify("Saved "..self.configName,{title="CONFIG"});self:_consume()end
+    end
+    local function configBox(x,w)
+        if w<=0 then return end
+        local hov=self:_hit(x,top,w,h)and not(self.openDrop or self.keyMenu or self.colorPopup or self.groupPopup or self.accountOpen)
+        self:_fill("control",x,top,w,h,hov and"controlHover"or"card",12*s);self:_out(x,top,w,h,12*s,.8,self:_color("outline"),105)
+        local fs=max(12*s,min(17*s,w*.12))
+        textC(fit(self.configName,max(8,w-34*s),fs,"Verdana"),x+12*s,top+25*s,self:_color("text"),fs,"Verdana")
+        if w>=48*s then chevDown(x+w-17*s,top+25*s,min(14*s,w*.16),self:_color("chev"),self.configPopup~=nil)end
+        if Input.click and not self._consumed and hov then self.configPopup=self.configPopup and nil or{x=x,y=top+h+6*s,w=max(100*s,w)};self.openDrop=nil;self.keyMenu=nil;self.colorPopup=nil;self.groupPopup=nil;self.accountOpen=false;self:_consume()end
+    end
+    local function groupBox(x,w)
+        if w<=0 then return end
+        local hov=self:_hit(x,top,w,h)and not(self.openDrop or self.keyMenu or self.colorPopup or self.configPopup or self.accountOpen)
+        self:_fill("control",x,top,w,h,hov and"controlHover"or"card",12*s);self:_out(x,top,w,h,12*s,.8,self:_color("outline"),105)
+        local fs=max(11*s,min(16*s,w*.13))
+        textC(fit(self.group,max(8,w-30*s),fs,"Verdana"),x+10*s,top+25*s,self:_color("text"),fs,"Verdana")
+        if w>=44*s then chevDown(x+w-15*s,top+25*s,min(13*s,w*.16),self:_color("chev"),self.groupPopup~=nil)end
+        if Input.click and not self._consumed and hov then
+            if type(self.groupClick)=="function"then pcall(self.groupClick,self)else self.groupPopup=self.groupPopup and nil or{x=x,y=top+h+6*s,w=max(96*s,w)}end
+            self.openDrop=nil;self.keyMenu=nil;self.colorPopup=nil;self.configPopup=nil;self.accountOpen=false;self:_consume()
+        end
+    end
+    local function searchBox(x,w)
+        local hov=self:_hit(x,top,w,h)and not self:_hasPopup()
+        if hov then self:_fill("control",x,top,w,h,"activeItem",12*s)end
+        self:_icon("search",x+w*.5,top+h*.5,min(20*s,w*.45),hov and"text"or"icon")
+        if Input.click and not self._consumed and not self:_hasPopup()and hov then self.searchOpen=not self.searchOpen;self:_consume()end
+    end
+
+    if avail>=470*s then
+        local saveW=50*s;local searchW=44*s;local groupW=142*s
+        local configX=left+saveW+gap
+        local configW=min(245*s,max(100*s,avail-saveW-searchW-groupW-gap*3-11*s))
+        local groupX=configX+configW+18*s;local searchX=right-searchW
+        if groupX+groupW>searchX-10*s then groupW=max(72*s,searchX-10*s-groupX)end
+        saveBox(left,saveW);configBox(configX,configW);groupBox(groupX,groupW);searchBox(searchX,searchW)
+    elseif avail>=205*s then
+        local saveW=40*s;local rest=avail-saveW-gap*2
+        local groupW=clamp(rest*.42,64*s,110*s);local configW=max(64*s,rest-groupW)
+        if configW+groupW>rest then groupW=max(58*s,rest-configW)end
+        local configX=left+saveW+gap;local groupX=configX+configW+gap
+        saveBox(left,saveW);configBox(configX,configW);groupBox(groupX,max(0,right-groupX))
+    elseif avail>=126*s then
+        local each=(avail-gap)*.5;configBox(left,each);groupBox(left+each+gap,max(0,right-(left+each+gap)))
+    else
+        configBox(left,avail)
+    end
+end
+
+function Window:_drawPanelHeader()
+    local s=self.scale;local X,Y=self.x,self.y;local W=self.width*s
+    self:_fill("sidebar",X,Y,W,64*s,"card",self.corner*s)
+    line(X+12*s,Y+64*s,X+W-12*s,Y+64*s,self:_color("line"),1,36)
+    local toggle=tostring(self.toggleLabel or"");local tw=measure(toggle,12*s,"Verdana")
+    local textRight=X+W-18*s-(toggle~=""and(tw+16*s)or 0)
+    local maxText=max(28*s,textRight-(X+18*s))
+    textC(fit(self.brand,maxText,18*s,"Verdana"),X+18*s,Y+25*s,self:_color("text"),18*s,"Verdana")
+    if self.subtitle~=""then textC(fit(self.subtitle,maxText,12*s,"Verdana"),X+18*s,Y+45*s,self:_color("muted"),12*s,"Verdana")end
+    if toggle~=""then textC(toggle,X+W-18*s-tw,Y+32*s,self:_color("muted"),12*s,"Verdana")end
+end
+
+-- Timed recovery handles assets added after the window was created without decoding every frame.
+local function retryWindowAsset(w,which)
+    local field=which=="logo"and"logoImage"or"profileImage"
+    local pathField=which=="logo"and"logoImagePath"or"profileImagePath"
+    if w[field]or not w[pathField]or w[pathField]==""then return end
+    local n=nowMs();local key=which=="logo"and"_nextLogoRetryFix"or"_nextProfileRetryFix"
+    if n<(w[key]or 0)then return end;w[key]=n+1500
+    if which=="logo"then w:SetLogoImage(w[pathField],true)else w:SetProfileImage(w[pathField],true)end
+end
+
+-- A custom transparent logo replaces the fallback tile instead of sitting on a white square.
+function Window:_drawLogo()
+    retryWindowAsset(self,"logo")
+    local s=self.scale;local X,Y=self.x,self.y;local lx,ly=X+25*s,Y+20*s
+    if self.logoImage then
+        drawImage(self.logoImage,lx,ly,50*s,50*s,1)
+    else
+        self:_fill("control",lx,ly,50*s,50*s,"logoBg",12*s,255)
+        local lw,lh=measure(self.logo,24*s,"Verdana");text(self.logo,lx+25*s-lw*.5,ly+25*s-lh*.5,self:_color("logoFg"),24*s,"Verdana")
+    end
+    local tx=X+98*s;local maxW=max(38*s,(REF.Sidebar-118)*s)
+    textC(fit(self.brand,maxW,22*s,"Verdana"),tx,Y+33*s,self:_color("white"),22*s,"Verdana")
+    local lines=wrapText(self.subtitle,maxW,11*s,"Verdana",2);if #lines==0 then lines={""}end
+    local baseY=Y+50*s;local step=12*s
+    for i,v in ipairs(lines)do textC(v,tx,baseY+(i-1)*step,self:_color("muted"),11*s,"Verdana")end
+end
+
+local sidebarAssetBase=Window._drawSidebar
+function Window:_drawSidebar()
+    retryWindowAsset(self,"profile")
+    return sidebarAssetBase(self)
+end
+
+Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
+Fawn.DynamicCapabilities.ResponsiveSecondaryWindows=true
+Fawn.DynamicCapabilities.PersistentESPElementCapture=true
+Fawn.DynamicCapabilities.ManagedImageFallbackDraw=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.ESPElementDrag="original Fawn slot drag + docked/standalone persistent pointer capture"
+Fawn.Runtime.SecondaryUI="responsive topbar + automatic narrow-column reflow + bounded panel header"
+Fawn.Runtime.ManagedImages="sandbox-normalized paths + LoadImage cache + 5-arg draw.Image compatibility + timed retry"
 end
 
 return Fawn
