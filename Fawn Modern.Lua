@@ -1303,8 +1303,29 @@ return c and c:Get()or nil end
 function Window:SetValue(flag,v,silent)local c=self:GetControl(flag)
 if c then c:Set(v,silent)end
 return self end
-function Window:ForEachControl(fn)for _,t in ipairs(self.tabs)do if not t.destroyed then for _,s in ipairs(t.sections)do if not s.destroyed then for _,c in ipairs(s.controls)do if not c.destroyed then fn(c,s,t)end end end end end end
-return self end
+function Window:ForEachControl(fn)
+    if type(fn)~="function"then return self end
+    local seen={}
+    local function walkControl(c,s,t)
+        if not c or c.destroyed or seen[c]then return end
+        seen[c]=true
+        fn(c,s,t)
+        local extra=c.extraSection
+        if extra and not extra.destroyed then
+            for _,ec in ipairs(extra.controls or{})do walkControl(ec,extra,t)end
+        end
+    end
+    for _,t in ipairs(self.tabs)do
+        if not t.destroyed then
+            for _,s in ipairs(t.sections)do
+                if not s.destroyed then
+                    for _,c in ipairs(s.controls)do walkControl(c,s,t)end
+                end
+            end
+        end
+    end
+    return self
+end
 function Window:GetConfig()
     local out={version=Fawn.Version,theme=self.themeName,style={scale=self.scale,liquidGlass=self.liquidGlass,glassOpacity=self.glassOpacity},controls={}}
     self:ForEachControl(function(c)if c.flag and not c.noConfig then if c.type=="keybind"then out.controls[c.flag]={type="keybind",key=c.key,label=c.keyLabel,mode=c.mode}elseif c.type=="color"then out.controls[c.flag]={type="color",value=copy(c.value)}elseif c.type~="button"and c.type~="buttonpair"and c.type~="label"and c.type~="separator"and c.type~="spacer"and c.type~="value"then local d={type=c.type,value=copy(c:GetRaw())}
@@ -9442,6 +9463,13 @@ local function accDrawRow(win,parent,c,x,y,w,h,C,locked)
         return
     end
 
+    if c.type=="keybind"then
+        local ch=parent.child
+        local own=ch and ch.kind=="keybind"and ch.control==c
+        win:_drawAccessoryKeybindRowUnified(parent,c,c.label or"Keybind",x,y,w,h,C,(not locked)or own)
+        return
+    end
+
     if c.type=="slider"then
         local editing=win.sliderEdit and win.sliderEdit.control==c
         local display=win:_sliderDisplay(c,c.value or c.min)
@@ -9490,12 +9518,9 @@ function Window:_drawExtraPopup()
     local locked=p.child~=nil
 
     if keyRows==1 then
-        local k=owner.keybind;local shown=self:_keyLabel(k)
-        local tw=measure(shown,C.keyFont*s,"Verdana");local fw=min(126*s,max(76*s,tw+C.keyPad*2*s));local fh=C.keyH*s
-        local fx=p.x+p.w-C.padR*s-fw;local fy=y+(rowH-fh)*.5;local cy=y+rowH*.5
-        textC("Keybind",p.x+C.padL*s,cy,self:_color("text"),C.font*s,"Verdana")
-        self:_fill("control",fx,fy,fw,fh,"control",C.keyR*s)
-        textC(shown,fx+(fw-tw)*.5,cy,self:_color("text"),C.keyFont*s,"Verdana")
+        local k=owner.keybind
+        local own=p.child and p.child.kind=="keybind"and p.child.control==k
+        self:_drawAccessoryKeybindRowUnified(p,k,"Keybind",p.x,y,p.w,rowH,C,(not locked)or own)
         y=y+rowH
     end
 
@@ -9508,7 +9533,8 @@ function Window:_drawExtraPopup()
     local ch=p.child
     if ch then
         if ch.kind=="dropdown"then accDrawDropdown(self,p,ch)
-        elseif ch.kind=="color"then accDrawColor(self,p,ch)end
+        elseif ch.kind=="color"then accDrawColor(self,p,ch)
+        elseif ch.kind=="keybind"then self:_drawAccessoryKeybindMenuUnified(p,ch)end
     end
 
     if p.child and(Input.click or Input.rightClick)and not self._consumed then
@@ -9736,10 +9762,131 @@ Fawn.DynamicCapabilities.UnifiedColorPickerRenderer=true
 Fawn.Runtime.ColorPicker="one canonical original-Fawn renderer for normal, attached, settings/theme, and three-dot accessory color pickers"
 end)()
 
-Fawn.Version="10.0.9-serotonin"
-Fawn.APIRevision=49
-Fawn.BuildId="fawn-modern-10.0.9-unified-original-colorpicker-20260917"
-Fawn.PolishVersion="10.0.9"
+;(function()
+local Window=Fawn.Classes.Window
+
+function Window:_drawAccessoryKeybindRowUnified(parentPopup,k,label,x,y,w,h,C,interactive)
+    if not parentPopup or not alive(k)then return end
+    local s=self.scale
+    local left=x+C.padL*s
+    local right=x+w-C.padR*s
+    local cy=y+h*.5
+
+    textC(fit(label or k.label or"Keybind",max(30*s,w*.40),C.font*s,"Verdana"),left,cy,self:_color("text"),C.font*s,"Verdana")
+
+    local shown=self:_keyLabel(k)
+    local tw=measure(shown,C.keyFont*s,"Verdana")
+    local fw=min(138*s,max(76*s,tw+C.keyPad*2*s))
+    local fh=C.keyH*s
+    local fx,fy=right-fw,cy-fh*.5
+    local hov=self:_hit(fx,fy,fw,fh)
+
+    local dotR=C.dots*s
+    local dx=fx-C.dotsGap*s-dotR
+    local dhx,dhy=dx-dotR,cy-dotR
+    local dhs=dotR*2
+    local dhov=self:_hit(dhx,dhy,dhs,dhs)
+
+    local own=parentPopup.child and parentPopup.child.kind=="keybind"and parentPopup.child.control==k
+    self:_fill("control",fx,fy,fw,fh,(hov or self.captureBind==k)and"controlHover"or"control",C.keyR*s)
+    if self.captureBind==k then self:_out(fx,fy,fw,fh,C.keyR*s,1,self:_color("accent"),255)end
+    textC(shown,fx+(fw-tw)*.5,cy,self.captureBind==k and self:_color("accent")or self:_color("text"),C.keyFont*s,"Verdana")
+    self:_icon("dots",dx,cy,C.dots*s,(own or dhov)and"text"or"muted")
+
+    if interactive and not self._consumed then
+        -- Left-clicking the key field always starts capture, including the
+        -- FIRST built-in keybind row at the top of the three-dot menu.
+        if Input.click and hov then
+            parentPopup.child=nil
+            self.keyMenu=nil
+            self.captureBind=k
+            self._captureFrame=E.paintCount
+            self._captureControl97=nil
+            self._captureArmed97=nil
+            self.inputEdit=nil
+            self.sliderEdit=nil
+            self:_consume()
+            return
+        end
+
+        -- Click the dots OR right-click the key field for Hold/Toggle/Always.
+        if (Input.click and dhov)or(Input.rightClick and hov)then
+            self.keyMenu=nil
+            accOpenChild(
+                self,parentPopup,"keybind",k,
+                fx,fy+fh+5*s,170*s,5*C.itemH*s,
+                dhx,dhy,dhs,dhs
+            )
+            self:_consume()
+            return
+        end
+    end
+end
+
+function Window:_drawAccessoryKeybindMenuUnified(parentPopup,ch)
+    local k=ch and ch.control
+    if not parentPopup or not alive(k)then if parentPopup then parentPopup.child=nil end return end
+
+    local s=self.scale
+    local C=REF.Compact
+    local items={
+        {"Hold","Hold"},
+        {"Toggle","Toggle"},
+        {"Always","Always"},
+        {"Clear","__clear"},
+        {"Close","__close"}
+    }
+
+    ch.w=max(ch.w or 170*s,170*s)
+    ch.h=#items*C.itemH*s+12*s
+    ch.anchorY=ch.triggerY or ch.y
+    self:_clampPopup(ch)
+    self:_popupFrame(ch)
+
+    for i,it in ipairs(items)do
+        local yy=ch.y+6*s+(i-1)*C.itemH*s
+        local hov=self:_hit(ch.x+5*s,yy,ch.w-10*s,C.itemH*s)
+        if hov then self:_fill("control",ch.x+5*s,yy,ch.w-10*s,C.itemH*s,"controlHover",C.itemR*s)end
+
+        local selected=k.mode==it[2]
+        textC(
+            it[1],
+            ch.x+12*s,
+            yy+C.itemH*s*.5,
+            self:_color(it[2]=="__clear"and"danger"or(selected and"accent"or"text")),
+            C.itemFont*s,
+            "Verdana"
+        )
+        if selected then ICON.check(ch.x+ch.w-20*s,yy+C.itemH*s*.5,12*s,self:_color("accent"))end
+
+        if Input.click and not self._consumed and hov then
+            if it[2]=="__clear"then
+                k:ClearKey()
+            elseif it[2]~="__close"then
+                k:SetMode(it[2])
+            end
+            parentPopup.child=nil
+            self:_consume()
+            return
+        end
+    end
+
+    -- The entire child shell owns pointer presses, including its padding.
+    if (Input.click or Input.rightClick)and not self._consumed and self:_hit(ch.x,ch.y,ch.w,ch.h)then
+        self:_consume()
+    end
+end
+
+Fawn.DynamicCapabilities.AccessoryKeybindV2=true
+Fawn.DynamicCapabilities.AccessoryKeybindListLive=true
+Fawn.Runtime.AccessoryKeybind="dedicated three-dot keybind row/menu for both built-in and custom accessory keybinds; left-click capture + dots/right-click mode menu"
+Fawn.Runtime.KeybindList="recursive live discovery includes Control:Extra/AddAccessoryKeybind controls and attached keybinds"
+end)()
+
+Fawn.Version="10.1.0-serotonin"
+Fawn.APIRevision=50
+Fawn.BuildId="fawn-modern-10.1.0-accessory-keybind-live-20260917"
+Fawn.PolishVersion="10.1.0"
 Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
 Fawn.DynamicCapabilities.ProtectedNativeDraw=true
 Fawn.DynamicCapabilities.StrictDropdownChromeModal=true
