@@ -1026,10 +1026,12 @@ local function drawImage(id,x,y,w,h,a)
     if type(fn)~="function"then return false end
     if type(x)~="number"or type(y)~="number"or type(w)~="number"or type(h)~="number"or w<=0 or h<=0 then return false end
     x,y,w,h=floor(x+.5),floor(y+.5),max(1,floor(w+.5)),max(1,floor(h+.5))
-    -- Deliberately use the raw 5-argument image overload. This is the same form
-    -- used by the working Serotonin image/GIF path and applies no library tint,
-    -- color multiplication, alpha override, glass tint, or theme color.
+
+    -- Prefer the raw Serotonin image overload: no theme tint, no glass tint,
+    -- no alpha/color multiplication. Fall back to explicit neutral white only
+    -- if this runtime rejects the short overload.
     local ok,err=pcall(fn,id,x,y,w,h)
+    if not ok then ok,err=pcall(fn,id,x,y,w,h,IMAGE_WHITE,1)end
     if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
     return ok
 end
@@ -6137,8 +6139,29 @@ function Window:_render()
     if self._pendingScale then local q=self._pendingScale;self._pendingScale=nil;applyScale93(self,q)end
     self:_toggleByKey();self:_processKeybinds();self:_processBindCapture();self:_processInputEdit();self:_processSliderEdit()
     if not self.visible then return end
-    self._inRender=true;self._consumed=false;self:_updateWindowDragResize()
-    local s=self.scale;local X,Y=self.x,self.y;local W,H=self.width*s,self.height*s
+
+    self._inRender=true
+    self._consumed=false
+
+    -- Clicking the same normal dropdown field closes it before any underlying
+    -- controls see the click.
+    if self.openDrop and Input.click and not self._consumed then
+        local p=self.openDrop
+        if p.triggerX and p.triggerY and p.triggerW and p.triggerH and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
+            self.openDrop=nil
+            self:_consume()
+        end
+    end
+
+    -- Never begin a new window drag/resize through a popup.
+    if not self:_hasPopup() or self.dragging or self.resizing then
+        self:_updateWindowDragResize()
+    end
+
+    local s=self.scale
+    local X,Y=self.x,self.y
+    local W,H=self.width*s,self.height*s
+
     if (Input.click or Input.rightClick)and not self._consumed and self:_hasPopup()then
         local inside=false
         for _,p in pairs({self.openDrop,self.extraPopup,self.keyMenu,self.colorPopup,self.colorMenu,self.configPopup,self.groupPopup})do
@@ -6149,25 +6172,80 @@ function Window:_render()
                 if ch and ch.x and ch.y and ch.w and ch.h and self:_hit(ch.x,ch.y,ch.w,ch.h)then inside=true break end
             end
         end
-        if self.accountOpen then local _,py=self:_sidebarGeometry();if self:_hit(X+7*s,py-244*s,261*s,236*s)or self:_hit(X+15*s,py,245*s,55*s)then inside=true end end
-        if self.searchOpen then local sw=310*s;local sx=X+(self.width-REF.RightMargin)*s-sw;local sy=Y+78*s;if self:_hit(sx,sy,sw,44*s)then inside=true end end
+        if self.accountOpen then
+            local _,py=self:_sidebarGeometry()
+            if self:_hit(X+7*s,py-244*s,261*s,236*s)or self:_hit(X+15*s,py,245*s,55*s)then inside=true end
+        end
+        if self.searchOpen then
+            local sw=310*s;local sx=X+(self.width-REF.RightMargin)*s-sw;local sy=Y+78*s
+            if self:_hit(sx,sy,sw,44*s)then inside=true end
+        end
         if not inside then self:_closePopups();self:_consume()end
     end
-    self:_fill("main",X,Y,W,H,"menuBg",self.corner*s);self:_drawContent();local r=self.corner*s
-    if self.kind=="Panel"or self.tabBarVisible==false then
-        local topH=72*s;local botH=18*s;maskTop93(self,X,Y,W,topH,r);maskBottom93(self,X,Y+H-botH,W,botH,r);local midY=Y+topH;local midH=max(0,H-topH-botH)
-        if midH>0 then self:_fill("main",X,midY,18*s,midH,"menuBg",0);self:_fill("main",X+W-18*s,midY,18*s,midH,"menuBg",0)end;self:_drawPanelHeader()
-    else
-        local topH=REF.ContentTop*s;local botH=15*s;maskTop93(self,X,Y,W,topH,r);maskBottom93(self,X,Y+H-botH,W,botH,r);local midY=Y+topH;local midH=max(0,H-topH-botH)
-        if midH>0 then self:_fill("main",X,midY,REF.ContentX*s,midH,"menuBg",0);self:_fill("main",X+W-REF.RightMargin*s,midY,REF.RightMargin*s,midH,"menuBg",0)end;self:_drawSidebar();self:_drawTopbar()
+
+    self:_fill("main",X,Y,W,H,"menuBg",self.corner*s)
+    self:_drawContent()
+
+    local r=self.corner*s
+    local modal=self:_hasPopup()
+
+    -- Draw sidebar/topbar/panel header normally, but remove *all* pointer state
+    -- while a dropdown/popup is above them. This prevents a dropdown selection
+    -- from also clicking the profile row, tabs, topbar buttons, or panel header.
+    local function drawChrome(fn)
+        if not modal then return fn(self)end
+        local click,rightClick,left,right,released,rightReleased,wheel=
+            Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel
+        Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=
+            false,false,false,false,false,false,0
+        local ok,a,b,c,d=pcall(fn,self)
+        Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=
+            click,rightClick,left,right,released,rightReleased,wheel
+        if not ok then error(a)end
+        return a,b,c,d
     end
+
+    if self.kind=="Panel"or self.tabBarVisible==false then
+        local topH=72*s;local botH=18*s
+        maskTop93(self,X,Y,W,topH,r)
+        maskBottom93(self,X,Y+H-botH,W,botH,r)
+        local midY=Y+topH;local midH=max(0,H-topH-botH)
+        if midH>0 then
+            self:_fill("main",X,midY,18*s,midH,"menuBg",0)
+            self:_fill("main",X+W-18*s,midY,18*s,midH,"menuBg",0)
+        end
+        drawChrome(Window._drawPanelHeader)
+    else
+        local topH=REF.ContentTop*s;local botH=15*s
+        maskTop93(self,X,Y,W,topH,r)
+        maskBottom93(self,X,Y+H-botH,W,botH,r)
+        local midY=Y+topH;local midH=max(0,H-topH-botH)
+        if midH>0 then
+            self:_fill("main",X,midY,REF.ContentX*s,midH,"menuBg",0)
+            self:_fill("main",X+W-REF.RightMargin*s,midY,REF.RightMargin*s,midH,"menuBg",0)
+        end
+        drawChrome(Window._drawSidebar)
+        drawChrome(Window._drawTopbar)
+    end
+
     self:_out(X,Y,W,H,r,self.borderThickness,self.outlineColor,255)
-    self:_drawExtraPopup();self:_drawDropdownPopup();self:_drawKeyMenu();self:_drawColorPopup();self:_drawColorMenu();self:_drawConfigPopup();self:_drawGroupPopup();self:_drawAccountPopup();self:_drawSearchPopup();self._inRender=false
+
+    -- Popups are always rendered after chrome with the real pointer restored.
+    self:_drawExtraPopup()
+    self:_drawDropdownPopup()
+    self:_drawKeyMenu()
+    self:_drawColorPopup()
+    self:_drawColorMenu()
+    self:_drawConfigPopup()
+    self:_drawGroupPopup()
+    self:_drawAccountPopup()
+    self:_drawSearchPopup()
+    self._inRender=false
 end
 
 Fawn.Runtime.Keybind97="original Fawn armed-after-release capture; canonical key names; activation callbacks; settings toggle-key suppression while editing"
 Fawn.Runtime.OverlayDrag97="drag state is stored separately from Overlay:_drag method; Watermark/KeybindList/InfoPanel/standalone ESP remain draggable"
-Fawn.Runtime.ModalPointer97="popup owner receives click/right/held/release/wheel; all underlying windows and overlays receive zero pointer state"
+Fawn.Runtime.ModalPointer97="popup owner receives pointer; content/sidebar/topbar/panel chrome are pointer-silent under popups; covered controls cannot receive the same click"
 Fawn.Runtime.ScrollEnd97="page maxScroll is computed from unscrolled content; page/Section thumb motion is applied before layout with exact endpoint snap"
 Fawn.Runtime.Outline97="window/Section/popup/overlay strokes share scale-aware inset thickness; main outline is drawn once in the final pass"
 Fawn.Runtime.WidgetHitboxes97="plain text rows never consume pointer input; switches/fields/buttons/pickers only"
@@ -7460,58 +7538,23 @@ local function imageBytesValid(data)
     return true
 end
 local function loadManaged(path,force)
-    path=normalizeSandboxFinal(path)
+    path=tostring(path or"")
     if path==""then return nil,"empty path" end
     if not force and managedTextures[path]~=nil then
         local cached=managedTextures[path]
-        return cached or nil,cached and nil or(imageErrors[path]or"image load failed"),path
+        return cached or nil,cached and nil or(imageErrors[path]or"image load failed")
     end
     managedTextures[path]=nil;imageErrors[path]=nil
     local f=fsFinal();if not f or type(f.read)~="function"then imageErrors[path]="file.read unavailable";return nil,imageErrors[path] end
+    local ok,data=pcall(f.read,path)
+    if not ok or type(data)~="string"or data==""then imageErrors[path]="could not read "..path;managedTextures[path]=false;return nil,imageErrors[path] end
+    local valid,why=imageBytesValid(data);if not valid then imageErrors[path]=why;managedTextures[path]=false;return nil,why end
     local loader=utility and utility.LoadImage
     if type(loader)~="function"then imageErrors[path]="utility.LoadImage unavailable";managedTextures[path]=false;return nil,imageErrors[path] end
-
-    local candidates,seen={},{}
-    local function add(v)
-        v=normalizeSandboxFinal(v)
-        local k=lower(v)
-        if v~=""and not seen[k]then seen[k]=true;candidates[#candidates+1]=v end
-    end
-    local base=basenameFinal(path)
-    add(path)
-    local l=lower(path)
-    if l:find("profile pictures/",1,true)then
-        add(PATHS.ProfilePictures.."/"..base);add("Profile Pictures/"..base)
-    elseif l:find("logo pictures/",1,true)then
-        add(PATHS.LogoPictures.."/"..base);add("Logo Pictures/"..base);add("logo pictures/"..base)
-    else
-        add(PATHS.ProfilePictures.."/"..base);add(PATHS.LogoPictures.."/"..base)
-    end
-    add(base)
-
-    local failures={}
-    for _,candidate in ipairs(candidates)do
-        local ok,data=pcall(f.read,candidate)
-        if ok and type(data)=="string"and data~=""then
-            local valid,why=imageBytesValid(data)
-            if valid then
-                local ok2,id=pcall(loader,data)
-                if ok2 and type(id)=="number"and id>0 then
-                    managedTextures[path]=id;managedTextures[candidate]=id
-                    imageErrors[path]=nil;imageErrors[candidate]=nil
-                    return id,nil,candidate
-                end
-                failures[#failures+1]=candidate..": "..(ok2 and"LoadImage returned no texture"or tostring(id))
-            else
-                failures[#failures+1]=candidate..": "..tostring(why)
-            end
-        else
-            failures[#failures+1]=candidate..": unreadable"
-        end
-    end
-    imageErrors[path]=table.concat(failures," | ")
-    managedTextures[path]=false
-    return nil,imageErrors[path]
+    local ok2,id=pcall(loader,data)
+    if ok2 and type(id)=="number"and id>0 then managedTextures[path]=id;return id end
+    imageErrors[path]=ok2 and"utility.LoadImage returned no texture"or tostring(id)
+    managedTextures[path]=false;return nil,imageErrors[path]
 end
 
 Fawn.StoragePaths={Root=ROOT,Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}
@@ -7551,8 +7594,7 @@ local function applyManagedImage(self,field,pathField,retryField,kind,v,force)
     if type(v)~="string"or v==""or v:sub(1,1)=="(" then self[field]=nil;self[pathField]=nil;self[retryField]=nil;return false,"no image selected" end
     local path=resolveFinal(kind,v);self[pathField]=path;self[retryField]=nil
     if force then managedTextures[path]=nil;imageErrors[path]=nil end
-    local tex,err,used=loadManaged(path,force==true);self[field]=tex
-    if tex and used then self[pathField]=used end
+    local tex,err=loadManaged(path,force==true);self[field]=tex
     return tex~=nil,err
 end
 function Window:SetProfileImage(v,force)local ok=applyManagedImage(self,"profileImage","profileImagePath","_profileImageRetry","ProfilePictures",v,force);return self,ok end
@@ -9651,90 +9693,14 @@ function Window:_drawExtraPopup()
     end
 end
 
-;(function()
-local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
-
-local function strictDropdownModal(w)
-    if not w then return false end
-    if w.openDrop then return true end
-    local p=w.extraPopup
-    local ch=p and p.child
-    return ch and(ch.kind=="dropdown"or ch.kind=="color")or false
-end
-
-local function muted(fn,self,...)
-    local state={Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel}
-    Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=false,false,false,false,false,false,0
-    local ok,a,b,c,d,e=pcall(fn,self,...)
-    Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=state[1],state[2],state[3],state[4],state[5],state[6],state[7]
-    if not ok then error(a)end
-    return a,b,c,d,e
-end
-
-local contentBase=Window._drawContent
-function Window:_drawContent()
-    if self.openDrop and Input.click and not self._consumed then
-        local p=self.openDrop
-        if p.triggerX and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
-            self.openDrop=nil;self:_consume()
-        end
-    end
-    if self.extraPopup and Input.click and not self._consumed then
-        local p=self.extraPopup
-        if p.triggerX and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
-            self.extraPopup=nil;self:_consume()
-        end
-    end
-    if self:_hasPopup()then return muted(contentBase,self)end
-    return contentBase(self)
-end
-
-local sidebarBase=Window._drawSidebar
-function Window:_drawSidebar()
-    if strictDropdownModal(self)then return muted(sidebarBase,self)end
-    return sidebarBase(self)
-end
-
-local topbarBase=Window._drawTopbar
-function Window:_drawTopbar()
-    if strictDropdownModal(self)then return muted(topbarBase,self)end
-    return topbarBase(self)
-end
-
-local panelBase=Window._drawPanelHeader
-function Window:_drawPanelHeader()
-    if strictDropdownModal(self)then return muted(panelBase,self)end
-    return panelBase(self)
-end
-
-local dragBase=Window._updateWindowDragResize
-function Window:_updateWindowDragResize()
-    if strictDropdownModal(self)and not self.dragging and not self.resizing then return end
-    return dragBase(self)
-end
-
-local popupBase=Window._drawDropdownPopup
-function Window:_drawDropdownPopup()
-    local p=self.openDrop
-    local inside=p and p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)
-    local pressed=Input.click or Input.rightClick
-    local a,b,c,d=popupBase(self)
-    if inside and pressed and not self._consumed then self:_consume()end
-    return a,b,c,d
-end
-
-Fawn.DynamicCapabilities.StrictDropdownModal=true
-Fawn.DynamicCapabilities.ManagedImagePathRecovery=true
-Fawn.Runtime.ModalPointer="every dropdown owns pointer input over content/sidebar/topbar/header; covered controls cannot receive the same click"
-Fawn.Runtime.ManagedImages="raw 5-argument draw.Image with no tint/alpha + multi-path sandbox recovery + cached LoadImage"
-end)()
-
-Fawn.Version="10.0.5-serotonin"
-Fawn.APIRevision=45
-Fawn.BuildId="fawn-modern-10.0.5-strict-dropdown-images-20260917"
-Fawn.PolishVersion="10.0.5"
+Fawn.Version="10.0.6-serotonin"
+Fawn.APIRevision=46
+Fawn.BuildId="fawn-modern-10.0.6-stable-modal-images-20260917"
+Fawn.PolishVersion="10.0.6"
 Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
 Fawn.DynamicCapabilities.ProtectedNativeDraw=true
+Fawn.DynamicCapabilities.StrictDropdownChromeModal=true
+Fawn.DynamicCapabilities.RawManagedImageDraw=true
 Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; no shared page popup state; typed accessory sliders"
 Fawn:SetPerformanceMode("Peak")
 
@@ -9747,7 +9713,7 @@ Fawn.DynamicCapabilities.UltraPeakRenderer=true
 Fawn.DynamicCapabilities.ReusedControlRects=true
 Fawn.Runtime.AccessoryPopupFinal="exclusive popup-layer pointer routing; nested dropdown/color/key children; left/right-click numeric slider editor"
 Fawn.Runtime.ESPPreview="clean corner-box preview; optional visibility; draggable slot widgets with stable release commit"
-Fawn.Runtime.ManagedImages="raw 5-argument draw.Image only; no library color/alpha/tint arguments; multi-path sandbox recovery + cached LoadImage"
+Fawn.Runtime.ManagedImages="raw 5-argument draw.Image first; neutral-white fallback only; no theme/glass tint path"
 Fawn.Runtime.Performance="Peak: protected native drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + cached text/colors + reduced color-picker/snow budgets"
 
 end
