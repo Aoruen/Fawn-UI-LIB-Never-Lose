@@ -6,7 +6,7 @@ local Fawn={
     IsModular=true,
     Namespace="FawnModern",
 }
-Fawn.Performance={Mode="Peak",FastDraw=true,SmartKeyPolling=true,SnowParticles=48,ImageRetryMs=5000,FrameNow=nil,FrameDt=nil,ScreenW=1920,ScreenH=1080,ScreenReady=false,RGB={},RGBCount=0,Fit={},FitCount=0,KeyWatch={}}
+Fawn.Performance={Mode="Peak",FastDraw=false,SmartKeyPolling=true,SnowParticles=48,ImageRetryMs=5000,FrameNow=nil,FrameDt=nil,ScreenW=1920,ScreenH=1080,ScreenReady=false,RGB={},RGBCount=0,Fit={},FitCount=0,KeyWatch={}}
 
 if type(draw)~="table" or type(Color3)~="table" then error("Fawn Modern: Serotonin draw and Color3 APIs are required") end
 if type(utility)~="table" or type(mouse)~="table" or type(keyboard)~="table" then error("Fawn Modern: Serotonin utility, mouse and keyboard APIs are required") end
@@ -136,7 +136,8 @@ end
 local function safeDraw(name,...)
     local fn=draw[name]
     if type(fn)~="function"then return false end
-    if Fawn.Performance.FastDraw then fn(...);return true end
+    -- Never call the native renderer naked. A bad native argument must become a
+    -- recoverable draw error instead of taking Serotonin down with the script.
     local ok,err=pcall(fn,...)
     if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
     return ok
@@ -175,8 +176,10 @@ local function text(t,x,y,c,size,fontName,a)
     t=tostring(t or"");if t==""then return end
     local fn=draw.Text or draw.text;if type(fn)~="function"then return end
     local tx,ty,col,font,alpha,fs=floor(x),floor(y),rgb(c),fontName or"Verdana",a==nil and(c[4]or 255)or a,floor((tonumber(size)or 15)+.5)
-    if Fawn.Performance.FastDraw then fn(t,tx,ty,col,font,alpha,fs);return end
-    local ok,err=pcall(fn,t,tx,ty,col,font,alpha,fs);if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
+    -- Text is also protected. This keeps a runtime-specific text signature
+    -- mismatch from becoming a native crash on the first paint frame.
+    local ok,err=pcall(fn,t,tx,ty,col,font,alpha,fs)
+    if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
 end
 local function textC(t,x,cy,c,size,fontName,a)local _,h=measure(t,size,fontName)
 text(t,x,cy-h*.5,c,size,fontName,a)end
@@ -8573,15 +8576,20 @@ end
 function Fawn:SetPerformanceMode(mode)
     local key=lower(tostring(mode or"Peak"));local P=self.Performance
     if key=="safe"then P.Mode="Safe";P.FastDraw=false;P.SmartKeyPolling=false;P.SnowParticles=70;P.ImageRetryMs=2500
-    elseif key=="balanced"then P.Mode="Balanced";P.FastDraw=true;P.SmartKeyPolling=true;P.SnowParticles=56;P.ImageRetryMs=4000
-    else P.Mode="Peak";P.FastDraw=true;P.SmartKeyPolling=true;P.SnowParticles=48;P.ImageRetryMs=5000 end
+    elseif key=="balanced"then P.Mode="Balanced";P.FastDraw=false;P.SmartKeyPolling=true;P.SnowParticles=56;P.ImageRetryMs=4000
+    else P.Mode="Peak";P.FastDraw=false;P.SmartKeyPolling=true;P.SnowParticles=48;P.ImageRetryMs=5000 end
     for _,w in ipairs(E.windows)do if w and not w.destroyed then w._snowFix=nil end end
     return self
 end
 function Fawn:GetPerformanceMode()return self.Performance.Mode end
 function Fawn:SetSnowParticleCount(v)self.Performance.SnowParticles=clamp(floor(tonumber(v)or self.Performance.SnowParticles),0,120);for _,w in ipairs(E.windows)do if w and not w.destroyed then w._snowFix=nil end end;return self end
 function Fawn:GetSnowParticleCount()return self.Performance.SnowParticles end
-function Fawn:SetFastDraw(v)self.Performance.FastDraw=v~=false;return self end
+function Fawn:SetFastDraw(v)
+    -- Kept for API compatibility. Native draw bypass is intentionally disabled;
+    -- all draw calls remain protected in every profile.
+    self.Performance.FastDraw=false
+    return self
+end
 function Fawn:GetFastDraw()return self.Performance.FastDraw==true end
 function Fawn:GetPerformanceStats()local P=self.Performance;return{mode=P.Mode,fastDraw=P.FastDraw,smartKeyPolling=P.SmartKeyPolling,snowParticles=P.SnowParticles,imageRetryMs=P.ImageRetryMs,measureCache=measureCount,fitCache=P.FitCount,rgbCache=P.RGBCount,windows=#E.windows,overlays=#E.overlays,notifications=#E.notifications,paintCount=E.paintCount,paintErrors=E.paintErrors,drawErrors=E.drawErrors}end
 
@@ -8591,7 +8599,7 @@ Fawn.DynamicCapabilities.SmartKeyPolling=true
 Fawn.DynamicCapabilities.ColorObjectCache=true
 Fawn.DynamicCapabilities.TextLayoutCache=true
 Fawn.Runtime=Fawn.Runtime or{}
-Fawn.Runtime.Performance="Peak mode uses direct validated draw dispatch, cached Color3/text geometry, smart key polling, frame-value caching, bounded image retries and a reduced snow budget"
+Fawn.Runtime.Performance="Peak mode keeps protected native drawing while using cached Color3/text geometry, smart key polling, frame-value caching, reusable layout rectangles, bounded image retries and reduced effect budgets"
 
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.PremadeSettingsPage=true
@@ -9606,11 +9614,12 @@ function Window:_drawExtraPopup()
     end
 end
 
-Fawn.Version="10.0.3-serotonin"
-Fawn.APIRevision=43
-Fawn.BuildId="fawn-modern-10.0.3-accessory-child-hitfix-20260917"
-Fawn.PolishVersion="10.0.3"
+Fawn.Version="10.0.4-serotonin"
+Fawn.APIRevision=44
+Fawn.BuildId="fawn-modern-10.0.4-stable-native-draw-20260917"
+Fawn.PolishVersion="10.0.4"
 Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
+Fawn.DynamicCapabilities.ProtectedNativeDraw=true
 Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; no shared page popup state; typed accessory sliders"
 Fawn:SetPerformanceMode("Peak")
 
@@ -9624,7 +9633,7 @@ Fawn.DynamicCapabilities.ReusedControlRects=true
 Fawn.Runtime.AccessoryPopupFinal="exclusive popup-layer pointer routing; nested dropdown/color/key children; left/right-click numeric slider editor"
 Fawn.Runtime.ESPPreview="clean corner-box preview; optional visibility; draggable slot widgets with stable release commit"
 Fawn.Runtime.ManagedImages="explicit white/full-alpha draw.Image only; custom logo/profile images are not theme-tinted"
-Fawn.Runtime.Performance="Peak: cached direct drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + reduced color-picker/snow budgets"
+Fawn.Runtime.Performance="Peak: protected native drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + cached text/colors + reduced color-picker/snow budgets"
 
 end
 
