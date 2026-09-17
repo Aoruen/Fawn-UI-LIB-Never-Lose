@@ -6,6 +6,7 @@ local Fawn={
     IsModular=true,
     Namespace="FawnModern",
 }
+Fawn.Performance={Mode="Peak",FastDraw=true,SmartKeyPolling=true,SnowParticles=48,ImageRetryMs=5000,FrameNow=nil,FrameDt=nil,ScreenW=1920,ScreenH=1080,ScreenReady=false,RGB={},RGBCount=0,Fit={},FitCount=0,KeyWatch={}}
 
 if type(draw)~="table" or type(Color3)~="table" then error("Fawn Modern: Serotonin draw and Color3 APIs are required") end
 if type(utility)~="table" or type(mouse)~="table" or type(keyboard)~="table" then error("Fawn Modern: Serotonin utility, mouse and keyboard APIs are required") end
@@ -32,15 +33,29 @@ end
 local function arr(t)local n={}for i,v in ipairs(type(t)=="table"and t or{})do n[i]=v end return n end
 local function removeValue(t,v)for i=#t,1,-1 do if t[i]==v then remove(t,i)return true end end return false end
 local function indexOf(t,v)for i,x in ipairs(t or{})do if x==v then return i end end end
-local function nowMs()local ok,v=pcall(utility.GetTickCount)
-return ok and tonumber(v)or 0 end
-local function dt()local ok,v=pcall(utility.GetDeltaTime)
-return ok and tonumber(v)or(1/60)end
-local function screenSize()local ok,w,h=pcall(draw.GetScreenSize)
-if ok and type(w)=="number"and type(h)=="number"then return w,h end return 1920,1080 end
+local function nowMs()
+    local q=Fawn.Performance.FrameNow;if q~=nil then return q end
+    local ok,v=pcall(utility.GetTickCount);return ok and tonumber(v)or 0
+end
+local function dt()
+    local q=Fawn.Performance.FrameDt;if q~=nil then return q end
+    local ok,v=pcall(utility.GetDeltaTime);return ok and tonumber(v)or(1/60)
+end
+local function screenSize()
+    local P=Fawn.Performance
+    if P.ScreenReady then return P.ScreenW,P.ScreenH end
+    local ok,w,h=pcall(draw.GetScreenSize)
+    if ok and type(w)=="number"and type(h)=="number"then P.ScreenW,P.ScreenH,P.ScreenReady=w,h,true;return w,h end
+    return P.ScreenW,P.ScreenH
+end
 local function rgb(c)
-    if type(c)=="table"then return Color3.fromRGB(clamp(round(c[1]or c.r or 255),0,255),clamp(round(c[2]or c.g or 255),0,255),clamp(round(c[3]or c.b or 255),0,255)) end
-    return Color3.fromRGB(255,255,255)
+    local r,g,b=255,255,255
+    if type(c)=="table"then r=clamp(round(c[1]or c.r or 255),0,255);g=clamp(round(c[2]or c.g or 255),0,255);b=clamp(round(c[3]or c.b or 255),0,255)end
+    local key=r*65536+g*256+b;local P=Fawn.Performance;local out=P.RGB[key]
+    if out then return out end
+    out=Color3.fromRGB(r,g,b);P.RGB[key]=out;P.RGBCount=P.RGBCount+1
+    if P.RGBCount>2048 then P.RGB={[key]=out};P.RGBCount=1 end
+    return out
 end
 local function rgba(v,default)
     local d=default or{255,255,255,255}
@@ -109,14 +124,22 @@ Fawn.ThemeNames={"Modern Blue","Midnight","Graphite","Amethyst","Rose","Sakura",
 Fawn.Presets=PRESETS
 
 local E={windows={},overlays={},notifications={},paintCount=0,paintErrors=0,lastPaintError=nil,drawErrors=0,lastDrawError=nil,colorClipboard={255,255,255,255},notificationPosition="Bottom Right",nextId=0}
+Fawn.Performance.KeyWatchProvider=function()
+    for _,w in ipairs(E.windows)do if w and not w.destroyed and w.captureBind then return POLL end end
+    local out=Fawn.Performance.KeyWatch;for i=#out,1,-1 do out[i]=nil end;local seen={}
+    local function add(k)if k~=nil then k=tostring(k);if k~=""and not seen[k]then seen[k]=true;out[#out+1]=k end end end
+    for _,w in ipairs(E.windows)do if w and not w.destroyed then add(w.toggleKey);if w.toggleControl then add(w.toggleControl.key)end end end
+    if #out==0 then out[1]="Insert"end
+    return out
+end
 
 local function safeDraw(name,...)
     local fn=draw[name]
-if type(fn)~="function"then return false end
+    if type(fn)~="function"then return false end
+    if Fawn.Performance.FastDraw then fn(...);return true end
     local ok,err=pcall(fn,...)
-if not ok then E.drawErrors=E.drawErrors+1
-E.lastDrawError=tostring(err)end
-return ok
+    if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
+    return ok
 end
 local function rect(x,y,w,h,c,r,a)if w<=0 or h<=0 then return end
 safeDraw("RectFilled",floor(x),floor(y),max(1,floor(w+.5)),max(1,floor(h+.5)),rgb(c),max(0,tonumber(r)or 0),a==nil and(c[4]or 255)or a)end
@@ -131,7 +154,7 @@ local measureCount=0
 local function measure(textValue,size,fontName)
     local t=tostring(textValue or"")
 local f=fontName or"Verdana"
-local sz=tonumber(size)or 15
+local sz=max(1,floor((tonumber(size)or 15)+.5))
 local key=f.."\1"..sz.."\1"..t
 local q=measureCache[key]
 if q then return q[1],q[2]end
@@ -149,26 +172,38 @@ measureCache[key]={outW,outH}
 return outW,outH
 end
 local function text(t,x,y,c,size,fontName,a)
-    t=tostring(t or"")
-if t==""then return end
-    local fn=draw.Text or draw.text
-if type(fn)=="function"then local ok,err=pcall(fn,t,floor(x),floor(y),rgb(c),fontName or"Verdana",a==nil and(c[4]or 255)or a,floor((tonumber(size)or 15)+.5))
-if not ok then E.drawErrors=E.drawErrors+1
-E.lastDrawError=tostring(err)end end
+    t=tostring(t or"");if t==""then return end
+    local fn=draw.Text or draw.text;if type(fn)~="function"then return end
+    local tx,ty,col,font,alpha,fs=floor(x),floor(y),rgb(c),fontName or"Verdana",a==nil and(c[4]or 255)or a,floor((tonumber(size)or 15)+.5)
+    if Fawn.Performance.FastDraw then fn(t,tx,ty,col,font,alpha,fs);return end
+    local ok,err=pcall(fn,t,tx,ty,col,font,alpha,fs);if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
 end
 local function textC(t,x,cy,c,size,fontName,a)local _,h=measure(t,size,fontName)
 text(t,x,cy-h*.5,c,size,fontName,a)end
+local function renderedFontSize(size)return max(1,floor((tonumber(size)or 15)+.5))end
+local function caretWidth(t,size,fontName)
+    return measure(t or"",renderedFontSize(size),fontName or"Verdana")
+end
+local function caretLine(x,cy,shown,size,fontName,c,a)
+    local fs=renderedFontSize(size)
+    local sample=(shown and shown~="")and shown or"Ag"
+    local _,h=measure(sample,size,fontName or"Verdana")
+    local tx=floor(x+.5)
+    local ty=floor(cy-h*.5)
+    local th=max(fs,ceil(h))
+    line(tx,ty+1,tx,ty+th-1,c,max(1,floor((fs/14)+.5)),a or 255)
+end
 local function fit(t,maxW,size,fontName)
-    t=tostring(t or"")
-if maxW<=0 then return""end
-if measure(t,size,fontName)<=maxW then return t end
-    local ell="..."
-local ew=measure(ell,size,fontName)
-if ew>maxW then return""end
-    local lo,hi=0,#t
-while lo<hi do local m=ceil((lo+hi)/2)
-if measure(sub(t,1,m),size,fontName)+ew<=maxW then lo=m else hi=m-1 end end
-    return sub(t,1,lo)..ell
+    t=tostring(t or"");if maxW<=0 then return""end
+    local fs=max(1,floor((tonumber(size)or 15)+.5));local mw=max(0,floor(maxW+.5));local f=fontName or"Verdana";local P=Fawn.Performance
+    local ck=f.."\1"..fs.."\1"..mw.."\1"..t;local cached=P.Fit[ck];if cached~=nil then return cached end
+    local out
+    if measure(t,fs,f)<=mw then out=t else
+        local ell="...";local ew=measure(ell,fs,f)
+        if ew>mw then out="" else local lo,hi=0,#t;while lo<hi do local m=ceil((lo+hi)/2);if measure(sub(t,1,m),fs,f)+ew<=mw then lo=m else hi=m-1 end end;out=sub(t,1,lo)..ell end
+    end
+    P.Fit[ck]=out;P.FitCount=P.FitCount+1;if P.FitCount>4096 then P.Fit={[ck]=out};P.FitCount=1 end
+    return out
 end
 local function wrapText(t,maxW,size,fontName,maxLines)
     t=tostring(t or"")
@@ -251,13 +286,14 @@ local function wheelStep()
     for _,name in ipairs{"GetWheelDelta","getWheelDelta","get_wheel_delta","WheelDelta","wheelDelta","GetScrollDelta","getScrollDelta","get_scroll_delta"}do local f=mouse[name]
 if type(f)=="function"then local ok,v=pcall(f)
 if ok and type(v)=="number"and v~=0 then return v>0 and-1 or 1 end end end
-    for _,n in ipairs(WHEEL_UP)do if(type(mouse.IsClicked)=="function"and pcall(mouse.IsClicked,n)and select(2,pcall(mouse.IsClicked,n))==true)or keyState(n)then return-1 end end
-    for _,n in ipairs(WHEEL_DOWN)do if(type(mouse.IsClicked)=="function"and pcall(mouse.IsClicked,n)and select(2,pcall(mouse.IsClicked,n))==true)or keyState(n)then return 1 end end
+    for _,n in ipairs(WHEEL_UP)do local hit=false;if type(mouse.IsClicked)=="function"then local ok,v=pcall(mouse.IsClicked,n);hit=ok and v==true end;if hit or keyState(n)then return-1 end end
+    for _,n in ipairs(WHEEL_DOWN)do local hit=false;if type(mouse.IsClicked)=="function"then local ok,v=pcall(mouse.IsClicked,n);hit=ok and v==true end;if hit or keyState(n)then return 1 end end
     return 0
 end
 local prevLeft,prevRight=false,false
 local prevKeys={}
 local function pollInput()
+    local P=Fawn.Performance;local okT,vT=pcall(utility.GetTickCount);if okT then P.FrameNow=tonumber(vT)or P.FrameNow end;local okD,vD=pcall(utility.GetDeltaTime);if okD then P.FrameDt=tonumber(vD)or P.FrameDt end
     local ok,p=pcall(utility.GetMousePos)
 if ok and type(p)=="table"then Input.mx=tonumber(p[1])or Input.mx
 Input.my=tonumber(p[2])or Input.my end
@@ -270,8 +306,8 @@ if prevRight and not r then Input._rightReleaseQ=true end
     Input.left,Input.right=l,r
 prevLeft,prevRight=l,r
 Input._wheelQ=Input._wheelQ+wheelStep()
-    local nextKeys={}
-for _,k in ipairs(POLL)do local cur=nativeKey(k)
+    local nextKeys={};local provider=Fawn.Performance.KeyWatchProvider;local watch=(Fawn.Performance.SmartKeyPolling and type(provider)=="function"and provider())or POLL
+for _,k in ipairs(watch)do local cur=nativeKey(k)
 nextKeys[k]=cur
 if cur and not prevKeys[k]then Input._pressedQ[k]=true end
 if prevKeys[k]and not cur then Input._releasedKeysQ[k]=true end end
@@ -980,17 +1016,16 @@ if not ok or type(data)~="string"or data==""then return nil end
 if ok2 and type(id)=="number"then return id end
 return nil
 end
-local IMAGE_WHITE=Color3.fromRGB(255,255,255)
+local IMAGE_WHITE=Color3.new(1,1,1)
 local function drawImage(id,x,y,w,h,a)
     if type(id)~="number"then return false end
     local fn=draw and(draw.Image or draw.image)
     if type(fn)~="function"then return false end
     if type(x)~="number"or type(y)~="number"or type(w)~="number"or type(h)~="number"or w<=0 or h<=0 then return false end
     x,y,w,h=floor(x+.5),floor(y+.5),max(1,floor(w+.5)),max(1,floor(h+.5))
-    local aa=clamp(tonumber(a)or 1,0,1)
-    local ok,err
-    if aa>=.999 then ok,err=pcall(fn,id,x,y,w,h)end
-    if not ok then ok,err=pcall(fn,id,x,y,w,h,IMAGE_WHITE,aa)end
+    -- Managed/custom images are deliberately isolated from the theme renderer:
+    -- pure white modulation + full opacity, every time.
+    local ok,err=pcall(fn,id,x,y,w,h,IMAGE_WHITE,1)
     if not ok then E.drawErrors=E.drawErrors+1;E.lastDrawError=tostring(err)end
     return ok
 end
@@ -1740,7 +1775,7 @@ return end
     if rep("escape",anyKey("escape","ESCAPE",27),9999,9999)then self.sliderEdit=nil
 return end
     if rep("enter",anyKey("enter","ENTER",13),9999,9999)then local n=tonumber(ed.text)
-if n then c:Set(clamp(n,c.min,c.max))end
+if n then c:Set(n)end
 self.sliderEdit=nil
 return end
     if rep("back",anyKey("backspace","BACKSPACE",8))then local p=clamp(ed.cursor,0,#ed.text)
@@ -1852,8 +1887,10 @@ local label=c.type=="multiselect"and c:GetSummary()or tostring(c:Get()or"None")
 local maxW=fw-(F.ddPadL+F.ddPadR+F.chev+6)*s
 textC(fit(label,maxW,F.ddFont*s,"Verdana"),x+F.ddPadL*s,cy,self:_color("text"),F.ddFont*s,"Verdana")
 chevDown(x+fw-F.ddPadR*s-F.chev*s*.5,cy,F.chev*s,self:_color("chev"),open)
-        if interactive and Input.click and not self._consumed and not self:_hasPopup()and dh then self:_openDropdown(c,x,yy,fw,fh)
-self:_consume()end
+        if interactive and Input.click and not self._consumed and dh and(not self:_hasPopup()or open)then
+            if open then self.openDrop=nil else self:_openDropdown(c,x,yy,fw,fh)end
+            self:_consume()
+        end
     elseif c.type=="slider"then
         local display=self:_sliderDisplay(c,c.value)
 local editing=self.sliderEdit and self.sliderEdit.control==c
@@ -1885,10 +1922,13 @@ self:_consume()end
 self:_fill("control",vx,vy,vw,vh,(editing or vhv)and"controlHover"or"control",F.valR*s)
 if editing then self:_out(vx,vy,vw,vh,F.valR*s,1,self:_color("accent"),255)
 local pre=sub(shown,1,self.sliderEdit.cursor or#shown)
-local preW=measure(pre,F.valFont*s,"Verdana")
-local ex=vx+(vw-tw)*.5
+local ex=floor(vx+(vw-tw)*.5)
+local preW=caretWidth(pre,F.valFont*s,"Verdana")
 textC(shown,ex,cy,self:_color("text"),F.valFont*s,"Verdana")
-if(nowMs()-(self.sliderEdit.blink or 0))%900<450 then rect(ex+preW+1*s,cy-F.valFont*s*.55,max(1,s),F.valFont*s*1.1,self:_color("text"),0,255)end else textC(display,vx+(vw-tw)*.5,cy,self:_color("text"),F.valFont*s,"Verdana")end
+if(nowMs()-(self.sliderEdit.blink or 0))%900<450 then
+    local cx=clamp(ex+floor(preW+.5),floor(vx+2*s),floor(vx+vw-2*s))
+    caretLine(cx,cy,shown,F.valFont*s,"Verdana",self:_color("text"),255)
+end else textC(display,vx+(vw-tw)*.5,cy,self:_color("text"),F.valFont*s,"Verdana")end
         if interactive and Input.click and not self._consumed and not self:_hasPopup()and vhv then self:_startSliderEdit(c,{vx,vy,vw,vh})
 self:_consume()end
     elseif c.type=="input"then
@@ -4688,8 +4728,12 @@ function Window:_drawEmbeddedKeybindDots(parent,right,cy,F,interactive)
     local hx,hy=dx-F.dots*s,cy-F.dots*s
     local open=self.extraPopup and self.extraPopup.control==parent
     self:_icon("dots",dx,cy,F.dots*s,open and"text"or"muted")
-    if interactive and Input.click and not self._consumed and not self:_hasPopup() and self:_hit(hx,hy,hs,hs) then
-        self.extraPopup={control=parent,x=right-330*s,y=cy+F.dots*s+8*s,w=330*s,h=76*s,anchorY=cy-F.dots*s}
+    if interactive and Input.click and not self._consumed and(not self:_hasPopup()or open)and self:_hit(hx,hy,hs,hs)then
+        if open then
+            self.extraPopup=nil;self.openDrop=nil;self.keyMenu=nil;self.colorPopup=nil;self.colorMenu=nil
+        else
+            self.extraPopup={control=parent,x=right-330*s,y=cy+F.dots*s+8*s,w=330*s,h=76*s,anchorY=cy-F.dots*s,triggerX=hx,triggerY=hy,triggerW=hs,triggerH=hs}
+        end
         self:_consume()
     end
     return hx
@@ -4757,13 +4801,31 @@ function Window:_drawFawnInput(c,r,right,cy,F,interactive)
     local raw=tostring(c.value or"")
     local col=self:_color("text")
     if shown=="" and raw=="" and not focused then shown=tostring(c.placeholder or"");col=self:_color("muted")end
-    textC(shown,x+F.ddPadL*s,cy,col,F.ddFont*s,"Verdana")
+    local textX=floor(x+F.ddPadL*s)
+    textC(shown,textX,cy,col,F.ddFont*s,"Verdana")
     if focused and (nowMs()-(self.inputEdit.blink or 0))%900<450 then
-        local cx=clamp(x+F.ddPadL*s+caret,x+F.ddPadL*s-1,x+fw-F.ddPadR*s)
-        line(cx,cy-F.ddFont*s*.55,cx,cy+F.ddFont*s*.55,self:_color("accent"),max(1,s),255)
+        local cx=clamp(textX+floor(caret+.5),textX-1,floor(x+fw-F.ddPadR*s))
+        caretLine(cx,cy,shown,F.ddFont*s,"Verdana",self:_color("accent"),255)
     end
     if interactive and Input.click and not self._consumed and not self:_hasPopup() and hov then
-        self:_focusInput(c);self:_consume()
+        if not focused then self:_focusInput(c)end
+        local ed=self.inputEdit
+        if ed and ed.control==c then
+            local _,_,start=self:_visibleInputText(c,fw,F)
+            local rawv=tostring(c.value or"")
+            local masked=c.password and string.rep("*",#rawv)or rawv
+            local localX=clamp(Input.mx-textX,0,max(0,fw-(F.ddPadL+F.ddPadR)*s))
+            local best=max(0,start-1)
+            local bestDist=abs(localX)
+            for p=max(0,start-1),#masked do
+                local w=measure(sub(masked,start,p),renderedFontSize(F.ddFont*s),"Verdana")
+                local d=abs(localX-w)
+                if d<=bestDist then best,bestDist=p,d else break end
+            end
+            ed.cursor=clamp(best,0,#rawv)
+            ed.blink=nowMs()
+        end
+        self:_consume()
     end
 end
 local _processInputEdit92=Window._processInputEdit
@@ -5456,7 +5518,8 @@ end
 
 -- Smooth dropdown content and thumb; scrollbar has its own gutter and no longer tears through rows.
 function Window:_openDropdown(c,x,y,w,h)
-    self.openDrop={control=c,x=x,y=y+h+6*self.scale,w=w,scroll=tonumber(c.dropdownScroll)or 0,scrollTarget=tonumber(c.dropdownScroll)or 0,scrollView=tonumber(c.dropdownScroll)or 0};self.keyMenu=nil;self.colorPopup=nil;self.configPopup=nil;self.groupPopup=nil;self.accountOpen=false
+    self.openDrop={control=c,x=x,y=y+h+6*self.scale,w=w,scroll=tonumber(c.dropdownScroll)or 0,scrollTarget=tonumber(c.dropdownScroll)or 0,scrollView=tonumber(c.dropdownScroll)or 0,triggerX=x,triggerY=y,triggerW=w,triggerH=h}
+    self.keyMenu=nil;self.colorPopup=nil;self.colorMenu=nil;self.configPopup=nil;self.groupPopup=nil;self.accountOpen=false
 end
 function Window:_drawDropdownPopup()
     local p=self.openDrop;if not p then return end;local c=p.control;if not alive(c)or not visibilityPass(c)then self.openDrop=nil return end;if c.optionsSource then c:RefreshOptionsSource(false)end
@@ -5522,7 +5585,7 @@ function Window:_visibleInputText(c,fw,F)
     local masked=c.password and string.rep("*",#raw)or raw
     local ed=self.inputEdit and self.inputEdit.control==c and self.inputEdit or nil
     local cursor=ed and clamp(ed.cursor or#raw,0,#raw)or#raw
-    local fontSize=F.ddFont*self.scale
+    local fontSize=renderedFontSize(F.ddFont*self.scale)
     local maxW=max(8,fw-(F.ddPadL+F.ddPadR)*self.scale)
     local start=1
     while start<=cursor and measure(sub(masked,start,cursor),fontSize,"Verdana")>maxW-2*self.scale do start=start+1 end
@@ -6074,7 +6137,14 @@ function Window:_render()
     local s=self.scale;local X,Y=self.x,self.y;local W,H=self.width*s,self.height*s
     if (Input.click or Input.rightClick)and not self._consumed and self:_hasPopup()then
         local inside=false
-        for _,p in pairs({self.openDrop,self.extraPopup,self.keyMenu,self.colorPopup,self.colorMenu,self.configPopup,self.groupPopup})do if p and p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)then inside=true break end end
+        for _,p in pairs({self.openDrop,self.extraPopup,self.keyMenu,self.colorPopup,self.colorMenu,self.configPopup,self.groupPopup})do
+            if p then
+                if p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)then inside=true break end
+                if p.triggerX and p.triggerY and p.triggerW and p.triggerH and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then inside=true break end
+                local ch=p.child
+                if ch and ch.x and ch.y and ch.w and ch.h and self:_hit(ch.x,ch.y,ch.w,ch.h)then inside=true break end
+            end
+        end
         if self.accountOpen then local _,py=self:_sidebarGeometry();if self:_hit(X+7*s,py-244*s,261*s,236*s)or self:_hit(X+15*s,py,245*s,55*s)then inside=true end end
         if self.searchOpen then local sw=310*s;local sx=X+(self.width-REF.RightMargin)*s-sw;local sy=Y+78*s;if self:_hit(sx,sy,sw,44*s)then inside=true end end
         if not inside then self:_closePopups();self:_consume()end
@@ -6112,6 +6182,7 @@ if not ok then E.lastInputError=tostring(err)end
 end
 local function paintEvent()
     if not runtimeToken.active then return end
+    local P=Fawn.Performance;local okT,vT=pcall(utility.GetTickCount);if okT then P.FrameNow=tonumber(vT)or P.FrameNow end;local okD,vD=pcall(utility.GetDeltaTime);if okD then P.FrameDt=tonumber(vD)or P.FrameDt end;local okS,sw,sh=pcall(draw.GetScreenSize);if okS and type(sw)=="number"and type(sh)=="number"then P.ScreenW,P.ScreenH,P.ScreenReady=sw,sh,true end
     beginPaintInput();E.paintCount=E.paintCount+1;E.pointerConsumed=false
     local raw={click=Input.click,rightClick=Input.rightClick,left=Input.left,right=Input.right,released=Input.released,rightReleased=Input.rightReleased,wheel=Input.wheel}
     local function protected(fn,obj)local ok,err=pcall(fn,obj);if not ok then E.paintErrors=E.paintErrors+1;E.lastPaintError=tostring(err)end end
@@ -6122,11 +6193,8 @@ local function paintEvent()
 
     local popupOwner=nil
     for i=#E.windows,1,-1 do local w=E.windows[i];if hasModal97(w)then popupOwner=w;break end end
-    -- Docked ESP editors are rendered from inside their parent Window. Once a widget drag
-    -- begins, that parent must keep the real held/release mouse state or the editor sees a
-    -- false release on the next paint and immediately snaps the widget back.
     local activeOverlay=nil
-    if not popupOwner then for i=#E.overlays,1,-1 do local o=E.overlays[i];if alive(o)and(o._dragState or o._espDrag or o._dragElement)then activeOverlay=o;break end end end
+    if not popupOwner then for i=#E.overlays,1,-1 do local o=E.overlays[i];if alive(o)and(o._dragState or(o._espDrag and not(o.kind=="ESPPreview"and o.docked)))then activeOverlay=o;break end end end
     local activeWindow=nil
     if not popupOwner and not activeOverlay then for i=#E.windows,1,-1 do local w=E.windows[i];if windowActiveCapture97(w)then activeWindow=w;break end end end
     local frontOverlay=nil
@@ -6145,11 +6213,7 @@ local function paintEvent()
     if raw.click then if popupOwner then moveWindowTop96(popupOwner)elseif frontOverlay then moveOverlayTop96(frontOverlay)elseif windowOwner then moveWindowTop96(windowOwner)elseif backOverlay then moveOverlayTop96(backOverlay)end end
 
     for _,o in ipairs(E.overlays)do if alive(o)and o.layer=="back"and not(o.kind=="ESPPreview"and o.docked)and type(o._render)=="function"then pointer(backOverlay==o and not popupOwner);protected(o._render,o)end end
-    for _,w in ipairs(E.windows)do if alive(w)then
-        local dockedESP=activeOverlay and activeOverlay.kind=="ESPPreview"and activeOverlay.docked and activeOverlay.window==w
-        local owns=dockedESP or popupOwner==w or(not popupOwner and not activeOverlay and not frontOverlay and windowOwner==w)
-        pointer(owns);protected(w._render,w)
-    end end
+    for _,w in ipairs(E.windows)do if alive(w)then local owns=popupOwner==w or(not popupOwner and not activeOverlay and not frontOverlay and windowOwner==w);pointer(owns);protected(w._render,w)end end
     for _,o in ipairs(E.overlays)do if alive(o)and o.layer~="back"and not(o.kind=="ESPPreview"and o.docked)and type(o._render)=="function"then pointer(frontOverlay==o and not popupOwner);protected(o._render,o)end end
 
     -- Notifications cannot be clicked through a modal popup either.
@@ -6444,7 +6508,7 @@ function Window:_drawSidebar()
     local ux,uy,uw,uh=X+15*s,profileY,245*s,55*s
     local phov=self:_hit(ux,uy,uw,uh)and not(self.openDrop or self.keyMenu or self.colorPopup or self.configPopup or self.groupPopup)
     if phov or self.accountOpen then self:_fill("control",ux,uy,uw,uh,"activeItem",12*s)end
-    if self.profileImage then self:_fill("control",ux+8*s,uy+8*s,39*s,39*s,"control",19.5*s);drawImage(self.profileImage,ux+8*s,uy+8*s,39*s,39*s,1)
+    if self.profileImage then drawImage(self.profileImage,ux+8*s,uy+8*s,39*s,39*s,1)
     else circle(ux+27.5*s,uy+27.5*s,19.5*s,self:_color("avatar"),255);circle(ux+27.5*s,uy+22*s,6.5*s,self:_color("avatarDark"),255);safe("Rect",floor(ux+17*s),floor(uy+31*s),max(1,floor(21*s+.5)),max(1,floor(11*s+.5)),rgb(self:_color("avatarDark")),2*s,6*s,255)end
     textC(fit(self.profileName,139*s,16*s,"Verdana"),ux+58*s,uy+21*s,self:_color("text"),16*s,"Verdana")
     textC(fit(self.profileSubtitle,139*s,12*s,"Verdana"),ux+58*s,uy+39*s,self:_color("muted"),12*s,"Verdana")
@@ -7000,7 +7064,14 @@ function Window:_render()
     self:_toggleByKey();self:_processKeybinds();self:_processBindCapture();self:_processInputEdit();self:_processSliderEdit();if not self.visible then return end
     self._inRender=true;self._consumed=false;self:_updateWindowDragResize();local s=self.scale;local X,Y=self.x,self.y;local W,H=self.width*s,self.height*s;local I=Fawn.GetInputState and Fawn:GetInputState()or{}
     if (I.click or I.rightClick)and not self._consumed and self:_hasPopup()then
-        local inside=false;for _,p in pairs({self.openDrop,self.extraPopup,self.keyMenu,self.colorPopup,self.colorMenu,self.configPopup,self.groupPopup})do if p and p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)then inside=true break end end
+        local inside=false;for _,p in pairs({self.openDrop,self.extraPopup,self.keyMenu,self.colorPopup,self.colorMenu,self.configPopup,self.groupPopup})do
+            if p then
+                if p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)then inside=true break end
+                local ch=p.child
+                if ch and ch.x and ch.y and ch.w and ch.h and self:_hit(ch.x,ch.y,ch.w,ch.h)then inside=true break end
+                if p.triggerX and p.triggerY and p.triggerW and p.triggerH and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then inside=true break end
+            end
+        end
         if self.accountOpen then local p=self._profilePopupRect or accountRect982(self);local _,py=self:_sidebarGeometry();if self:_hit(p.x,p.y,p.w,p.h)or self:_hit(X+15*s,py,245*s,55*s)then inside=true end end
         if self.searchOpen then local sw=310*s;local sx=X+(self.width-(REF.RightMargin or 32))*s-sw;local sy=Y+78*s;if self:_hit(sx,sy,sw,44*s)then inside=true end end
         if not inside then self:_closePopups();self:_consume()end
@@ -7491,12 +7562,10 @@ function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
     local offset=sec.scroll or 0;offset=round(offset)
     local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5)
     self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
-    local rows={}for c,r in pairs(box.layouts or{})do rows[#rows+1]={c=c,r=r}end
-    sort(rows,function(a,b)if a.r.y==b.r.y then return a.r.x<b.r.x end return a.r.y<b.r.y end)
-    local eps=max(.65,s*.55)
-    for _,q in ipairs(rows)do
-        local r={x=q.r.x,y=round(q.r.y-offset),w=q.r.w,h=q.r.h}
-        if r.y>=clipT-eps and r.y+r.h<=clipB+eps then self:_drawControl(q.c,r,clipT,clipB)end
+    local eps=max(.65,s*.55);local layouts=box.layouts or{}
+    for _,c in ipairs(sec.controls or{})do
+        local q=layouts[c]
+        if q then local r={x=q.x,y=round(q.y-offset),w=q.w,h=q.h};if r.y>=clipT-eps and r.y+r.h<=clipB+eps then self:_drawControl(c,r,clipT,clipB)end end
     end
     if sec.columnDividers==true and sec.columns and sec.columns>1 then
         local gap=(sec.controlGap or 12)*s;local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s);local cw=(usable-gap*(sec.columns-1))/sec.columns
@@ -7757,7 +7826,7 @@ local function retryWindowAsset(w,which)
     local pathField=which=="logo"and"logoImagePath"or"profileImagePath"
     if w[field]or not w[pathField]or w[pathField]==""then return end
     local n=nowMs();local key=which=="logo"and"_nextLogoRetryFix"or"_nextProfileRetryFix"
-    if n<(w[key]or 0)then return end;w[key]=n+1500
+    if n<(w[key]or 0)then return end;w[key]=n+(Fawn.Performance.ImageRetryMs or 5000)
     if which=="logo"then w:SetLogoImage(w[pathField],true)else w:SetProfileImage(w[pathField],true)end
 end
 
@@ -7784,15 +7853,1779 @@ function Window:_drawSidebar()
     return sidebarAssetBase(self)
 end
 
+
+-- Original-Fawn background effects. These flags used to only store booleans in Modern;
+-- now they actually render. "Background Blur" matches the original Fawn behavior: a
+-- soft full-screen dim/frost layer behind the UI. Snow is lightweight and initialized lazily.
+function Window:SetBackgroundBlur(v)self.backgroundBlur=v==true;return self end
+function Window:SetBackgroundSnow(v)
+    self.backgroundSnow=v==true
+    if not self.backgroundSnow then self._snowFix=nil end
+    return self
+end
+function Window:_initBackgroundSnowFix()
+    local sw,sh=screenSize();self._snowFix={}
+    local count=clamp(floor(tonumber(Fawn.Performance.SnowParticles)or 48),0,120)
+    for i=1,count do
+        local r=math.random and math.random()or .5
+        local r2=math.random and math.random()or .5
+        local r3=math.random and math.random()or .5
+        local r4=math.random and math.random()or .5
+        local r5=math.random and math.random()or .5
+        self._snowFix[i]={x=r*sw,y=r2*sh,r=.7+r3*1.4,v=18+r4*34,drift=-7+r5*14,phase=(math.random and math.random()or .5)*6.28318530718}
+    end
+end
+function Window:_drawBackgroundFxFix()
+    if self.visible==false or self.destroyed or(not self.backgroundBlur and not self.backgroundSnow)then return end
+    if E._backgroundFxPaint==E.paintCount then return end
+    E._backgroundFxPaint=E.paintCount
+    local sw,sh=screenSize()
+    if self.backgroundBlur then rect(0,0,sw,sh,{9,8,12,255},0,105)end
+    if self.backgroundSnow then
+        if not self._snowFix or #self._snowFix==0 then self:_initBackgroundSnowFix()end
+        local d=clamp(dt(),0,.05);local tick=nowMs()*.001;local col=self:_color("white")
+        for i=1,#self._snowFix do
+            local q=self._snowFix[i]
+            q.y=q.y+q.v*d;q.x=q.x+(q.drift+sin(tick+q.phase)*4)*d
+            if q.y>sh+6 then q.y=-6;q.x=(math.random and math.random()or .5)*sw end
+            if q.x<-6 then q.x=sw+6 elseif q.x>sw+6 then q.x=-6 end
+            circle(q.x,q.y,q.r,col,145)
+        end
+    end
+end
+local renderBackgroundFxBase=Window._render
+function Window:_render()
+    self:_drawBackgroundFxFix()
+    return renderBackgroundFxBase(self)
+end
+
+
+-- ============================================================================
+-- Settings + accessory interaction finishing layer
+-- ============================================================================
+
+-- Color chips can be opened from inside the three-dot accessory popup.
+-- Normal controls still keep the existing modal guard.
+function Window:_drawColorChip(c,right,cy,F,interactive,allowNested)
+    local s=self.scale
+    local nominal=(F==REF.Compact)and REF.ColorChipCompact or REF.ColorChipFull
+    local sz=min(F.sw,nominal)*s
+    local x=right-sz
+    local y=cy-sz*.5
+    local rad=min(8*s,sz*.24)
+
+    self:_fill("control",x,y,sz,sz,"control",rad)
+    rect(x+1*s,y+1*s,sz-2*s,sz-2*s,c.value,max(1,rad-1*s),c.value[4]or 255)
+    self:_out(x,y,sz,sz,rad,.9,self:_color("outline"),220)
+
+    local sameColor=self.colorPopup and self.colorPopup.control==c
+    local sameMenu=self.colorMenu and self.colorMenu.control==c
+    local modalOK=allowNested==true or not self:_hasPopup()or sameColor or sameMenu
+    if interactive and not self._consumed and modalOK then
+        if Input.click and self:_hit(x,y,sz,sz)then
+            if sameColor then
+                self.colorPopup=nil
+            else
+                self.colorPopup={control=c,x=x+sz-232*s,y=y+sz+6*s,w=232*s,h=238*s,triggerX=x,triggerY=y,triggerW=sz,triggerH=sz}
+                self.colorMenu=nil
+            end
+            self:_consume()
+        elseif Input.rightClick and self:_hit(x,y,sz,sz)then
+            if sameMenu then
+                self.colorMenu=nil
+            else
+                self.colorMenu={control=c,x=Input.mx,y=Input.my,w=154*s,h=84*s,triggerX=x,triggerY=y,triggerW=sz,triggerH=sz}
+                self.colorPopup=nil
+            end
+            self:_consume()
+        end
+    end
+    return x,y,sz,sz
+end
+
+local function accessoryRowFinal(win,c,x,y,w,h,C,canInteract)
+    local s=win.scale
+    local left=x+C.padL*s
+    local right=x+w-C.padR*s
+    local cy=y+h*.5
+    local labelW=max(30*s,w*.42)
+    local label=fit(c.label or"",labelW,C.font*s,"Verdana")
+
+    if c.type~="button"and c.type~="label"and c.type~="separator"then
+        textC(label,left,cy,win:_color("text"),C.font*s,"Verdana")
+    end
+
+    if c.type=="toggle"then
+        local tw,th=C.togW*s,C.togH*s
+        local tx=right-tw
+        local ty=cy-th*.5
+        local on=c.value==true
+        rect(tx,ty,tw,th,on and win:_color("accent")or win:_color("toggleTrack"),th*.5,255)
+        local kp=(th-C.knob*s)*.5
+        circle(on and(tx+tw-kp-C.knob*s*.5)or(tx+kp+C.knob*s*.5),cy,C.knob*s*.5,win:_color("white"),255)
+        if canInteract and Input.click and not win._consumed and win:_hit(tx,ty,tw,th)then
+            c:Set(not on)
+            win:_consume()
+        end
+
+    elseif c.type=="slider"then
+        local editing=win.sliderEdit and win.sliderEdit.control==c
+        local display=win:_sliderDisplay(c,c.value or c.min)
+        local shown=editing and tostring(win.sliderEdit.text or"")or display
+        local tw=measure(shown,C.valFont*s,"Verdana")
+        local vw=max((editing and 64 or 48)*s,tw+C.valPad*2*s)
+        local vx=right-vw
+        local vh=C.valH*s
+        local vy=cy-vh*.5
+
+        local sx=left+labelW
+        local sw=max(28*s,vx-C.sGap*s-sx)
+        rect(sx,cy-2*s,sw,4*s,win:_color("control"),2*s,255)
+
+        local range=max(.00001,c.max-c.min)
+        local q=clamp((clamp(c.value or c.min,c.min,c.max)-c.min)/range,0,1)
+        local kx=sx+q*sw
+        rect(sx,cy-2*s,max(0,kx-sx),4*s,win:_color("accent"),2*s,255)
+        circle(kx,cy,max(4*s,C.sKnob*s*.32),win:_color("white"),255)
+
+        local vhv=win:_hit(vx,vy,vw,vh)
+        win:_fill("control",vx,vy,vw,vh,(editing or vhv)and"controlHover"or"control",C.valR*s)
+        if editing then
+            win:_out(vx,vy,vw,vh,C.valR*s,1,win:_color("accent"),255)
+            local ex=floor(vx+(vw-tw)*.5)
+            textC(shown,ex,cy,win:_color("text"),C.valFont*s,"Verdana")
+            local cursor=clamp(win.sliderEdit.cursor or#shown,0,#shown)
+            local pre=string.sub(shown,1,cursor)
+            local preW=caretWidth(pre,C.valFont*s,"Verdana")
+            if(nowMs()-(win.sliderEdit.blink or 0))%900<450 then
+                local cx=clamp(ex+floor(preW+.5),floor(vx+2*s),floor(vx+vw-2*s))
+                caretLine(cx,cy,shown,C.valFont*s,"Verdana",win:_color("text"),255)
+            end
+        else
+            textC(display,vx+(vw-measure(display,C.valFont*s,"Verdana"))*.5,cy,win:_color("text"),C.valFont*s,"Verdana")
+        end
+
+        if c._accessoryDrag then
+            if Input.left then
+                c:Set(c.min+clamp((Input.mx-sx)/max(1,sw),0,1)*(c.max-c.min))
+            else
+                c._accessoryDrag=nil
+            end
+        end
+
+        if canInteract and Input.click and not win._consumed then
+            if vhv then
+                win:_startSliderEdit(c,{vx,vy,vw,vh})
+                win:_consume()
+            elseif win:_hit(sx,cy-15*s,sw,30*s)then
+                c._accessoryDrag=true
+                c:Set(c.min+clamp((Input.mx-sx)/max(1,sw),0,1)*(c.max-c.min))
+                win:_consume()
+            end
+        end
+
+    elseif c.type=="dropdown"or c.type=="multiselect"then
+        local fw=min(148*s,max(82*s,w*.48))
+        local fh=C.ddH*s
+        local fx=right-fw
+        local fy=cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        local opened=win.openDrop and win.openDrop.control==c
+        win:_fill("control",fx,fy,fw,fh,(hov or opened)and"controlHover"or"control",C.ddR*s)
+        local textv=c.type=="multiselect"and c:GetSummary()or tostring(c:Get()or"None")
+        textC(fit(textv,fw-34*s,C.ddFont*s,"Verdana"),fx+C.ddPadL*s,cy,win:_color("text"),C.ddFont*s,"Verdana")
+        chevDown(fx+fw-C.ddPadR*s-C.chev*s*.5,cy,C.chev*s,win:_color("chev"),opened)
+        local ownDrop=win.openDrop and win.openDrop.control==c
+        if (canInteract or ownDrop)and Input.click and not win._consumed and hov then
+            if ownDrop then win.openDrop=nil else win:_openDropdown(c,fx,fy,fw,fh)end
+            win:_consume()
+        end
+
+    elseif c.type=="keybind"then
+        local shown=win:_keyLabel(c)
+        local tw=measure(shown,C.keyFont*s,"Verdana")
+        local fw=min(138*s,max(76*s,tw+C.keyPad*2*s))
+        local fh=C.keyH*s
+        local fx=right-fw
+        local fy=cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        win:_fill("control",fx,fy,fw,fh,hov and"controlHover"or"control",C.keyR*s)
+        textC(shown,fx+(fw-tw)*.5,cy,win.captureBind==c and win:_color("accent")or win:_color("text"),C.keyFont*s,"Verdana")
+        if canInteract and Input.click and not win._consumed and hov then
+            win.captureBind=c
+            win._captureFrame=E.paintCount
+            win:_consume()
+        elseif canInteract and Input.rightClick and not win._consumed and hov then
+            win.keyMenu={control=c,x=fx,y=fy+fh+5*s,w=162*s,h=3*C.itemH*s}
+            win:_consume()
+        end
+
+    elseif c.type=="color"then
+        local ownColor=(win.colorPopup and win.colorPopup.control==c)or(win.colorMenu and win.colorMenu.control==c)
+        win:_drawColorChip(c,right,cy,C,canInteract or ownColor,true)
+
+    elseif c.type=="input"then
+        local fw=min(150*s,max(86*s,w*.48))
+        local fh=C.ddH*s
+        local fx=right-fw
+        local fy=cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        win:_fill("control",fx,fy,fw,fh,hov and"controlHover"or"control",C.ddR*s)
+        local focused=win.inputEdit and win.inputEdit.control==c
+        local raw=tostring(c.value or"")
+        local shown,caret,start=win:_visibleInputText(c,fw,C)
+        local col=win:_color("text")
+        if raw==""and not focused then shown=tostring(c.placeholder or"");col=win:_color("muted")end
+        local textX=floor(fx+C.ddPadL*s)
+        textC(shown,textX,cy,col,C.ddFont*s,"Verdana")
+        if focused and(nowMs()-(win.inputEdit.blink or 0))%900<450 then
+            local cx=clamp(textX+floor(caret+.5),textX-1,floor(fx+fw-C.ddPadR*s))
+            caretLine(cx,cy,shown,C.ddFont*s,"Verdana",win:_color("accent"),255)
+        end
+        c._inputRect={fx,fy,fw,fh}
+        if canInteract and Input.click and not win._consumed and hov then
+            if not focused then win:_focusInput(c)end
+            local ed=win.inputEdit
+            if ed and ed.control==c then
+                local rawv=tostring(c.value or"")
+                local masked=c.password and string.rep("*",#rawv)or rawv
+                local _,_,vstart=win:_visibleInputText(c,fw,C)
+                local localX=clamp(Input.mx-textX,0,max(0,fw-(C.ddPadL+C.ddPadR)*s))
+                local best=max(0,vstart-1)
+                local bestDist=abs(localX)
+                for p=max(0,vstart-1),#masked do
+                    local ww=measure(sub(masked,vstart,p),renderedFontSize(C.ddFont*s),"Verdana")
+                    local d=abs(localX-ww)
+                    if d<=bestDist then best,bestDist=p,d else break end
+                end
+                ed.cursor=clamp(best,0,#rawv)
+                ed.blink=nowMs()
+            end
+            win:_consume()
+        end
+
+    elseif c.type=="button"then
+        local bx=left
+        local bw=right-left
+        local bh=max(28*s,h-12*s)
+        local by=cy-bh*.5
+        local hov=win:_hit(bx,by,bw,bh)
+        win:_fill("control",bx,by,bw,bh,hov and"controlHover"or"control",8*s)
+        local txt=fit(c.label,bw-18*s,C.font*s,"Verdana")
+        local tw=measure(txt,C.font*s,"Verdana")
+        textC(txt,bx+(bw-tw)*.5,cy,win:_color("text"),C.font*s,"Verdana")
+        if canInteract and Input.click and not win._consumed and hov then
+            if type(c.fn)=="function"then pcall(c.fn,c)end
+            win:_consume()
+        end
+
+    elseif c.type=="label"then
+        local lines=wrapText(c.label,max(20,right-left),C.font*s,"Verdana",c.maxLines or 3)
+        local lh=17*s
+        win:_drawWrapped(lines,left,cy-#lines*lh*.5,win:_color("text"),C.font*s,lh,false)
+
+    elseif c.type=="separator"then
+        local t=fit(upper(c.label),max(20,right-left),11*s,"Verdana")
+        textC(t,left,cy,win:_color("muted"),11*s,"Verdana")
+    end
+end
+
+-- Three-dot accessory popup is modal. When one of its child popups is open,
+-- the accessory rows become draw-only so a dropdown/color click cannot fall
+-- through and activate the row underneath it.
+function Window:_drawExtraPopup()
+    local p=self.extraPopup
+    if not p then return end
+    local parent=p.control
+    if not alive(parent)then self.extraPopup=nil return end
+
+    local s=self.scale
+    local C=REF.Compact
+    local k=parent.keybind
+    local extras=parent.extraSection and parent.extraSection.controls or{}
+    local keyRows=(k and not k.accessoryOnly)and 1 or 0
+    local visibleExtras={}
+    for _,c in ipairs(extras)do
+        if alive(c)and visibilityPass(c)then visibleExtras[#visibleExtras+1]=c end
+    end
+
+    local count=keyRows+#visibleExtras
+    local header=34*s
+    local rowH=C.rowH*s
+    p.w=REF.AccessoryWidth*s
+    p.h=header+max(1,count)*rowH+8*s
+    p.anchorY=p.anchorY or p.y-8*s
+    self:_clampPopup(p)
+    self:_popupFrame(p)
+
+    textC("OPTIONS",p.x+14*s,p.y+18*s,self:_color("muted"),12*s,"Verdana")
+
+    local nested=self.openDrop or self.colorPopup or self.colorMenu or self.keyMenu
+    local canInteract=not nested
+    local y=p.y+header
+
+    if k and not k.accessoryOnly then
+        local shown=self:_keyLabel(k)
+        local tw=measure(shown,C.keyFont*s,"Verdana")
+        local fw=min(126*s,max(76*s,tw+C.keyPad*2*s))
+        local fh=C.keyH*s
+        local fx=p.x+p.w-C.padR*s-fw
+        local fy=y+(rowH-fh)*.5
+        local cy=y+rowH*.5
+        local hov=self:_hit(fx,fy,fw,fh)
+        textC("Keybind",p.x+C.padL*s,cy,self:_color("text"),C.font*s,"Verdana")
+        self:_fill("control",fx,fy,fw,fh,hov and"controlHover"or"control",C.keyR*s)
+        textC(shown,fx+(fw-tw)*.5,cy,self.captureBind==k and self:_color("accent")or self:_color("text"),C.keyFont*s,"Verdana")
+
+        if canInteract and Input.click and not self._consumed and hov then
+            self.captureBind=k
+            self._captureFrame=E.paintCount
+            self.inputEdit=nil
+            self:_consume()
+        elseif canInteract and Input.rightClick and not self._consumed and hov then
+            self.keyMenu={control=k,x=fx,y=fy+fh+5*s,w=162*s,h=3*C.itemH*s}
+            self:_consume()
+        end
+        y=y+rowH
+    end
+
+    for _,c in ipairs(visibleExtras)do
+        accessoryRowFinal(self,c,p.x,y,p.w,rowH,C,canInteract)
+        y=y+rowH
+    end
+
+    -- Consume an otherwise-unused click inside the accessory shell itself.
+    if canInteract and(Input.click or Input.rightClick)and not self._consumed and self:_hit(p.x,p.y,p.w,p.h)then
+        self:_consume()
+    end
+end
+
+-- A polished built-in settings page. Everything here is live functionality;
+-- it is intentionally not a page of decorative/demo-only switches.
+function Fawn:CreateSettingsPage(window,opt)
+    if window==self then window,opt=opt,nil end
+    if kind(window)~="Window"and kind(window)~="Panel"then
+        error("CreateSettingsPage requires a Fawn Window")
+    end
+    if window.settingsPage then return window.settingsPage end
+
+    self:EnsureStorage()
+    self:PreloadStorageImages(false)
+    opt=type(opt)=="table"and opt or{}
+
+    local SettingsClass=assert(Fawn.Classes and Fawn.Classes.SettingsPage,"Fawn SettingsPage class missing")
+    local page=setmetatable({Window=window,Controls={},ConfigPath=tostring(opt.configPath or"default.lua"),Defaults=nil},SettingsClass)
+    page:SetConfigPath(opt.configPath or"default.lua")
+
+    local tab=window:Tab(opt.title or"Settings",{group=opt.group or"MISCELLANEOUS",icon="settings"})
+    page.Tab=tab
+    tab.sidebarHidden=opt.showInSidebar==false or opt.profileOnly==true
+
+    local style=tab:Section("STYLE & MATERIAL",{column=1,row=1,sizeMode="auto"})
+    local windowFx=tab:Section("WINDOW & EFFECTS",{column=2,row=1,sizeMode="auto"})
+    local behavior=tab:Section("MOTION & INPUT",{column=1,row=2,sizeMode="auto"})
+    local profile=tab:Section("PROFILE & BRAND",{column=2,row=2,sizeMode="auto"})
+    local colors=tab:Section("THEME COLORS",{column=1,row=3,span=2,columns=2,sizeMode="fixed",height=500})
+    local config=tab:Section("CONFIGURATION",{column=1,row=4,sizeMode="auto"})
+    local diagnostics=tab:Section("DIAGNOSTICS",{column=2,row=4,sizeMode="auto"})
+    local performance=tab:Section("PERFORMANCE",{column=1,row=5,span=2,columns=2,sizeMode="auto"})
+
+    style:AddLabel("Live appearance controls for this window.",{muted=true,wrap=true,maxLines=2})
+    local ti=indexOf(Fawn.ThemeNames,window:GetThemeName())or 1
+    page.Controls.Theme=style:Dropdown("Theme",Fawn.ThemeNames,ti,{noConfig=true})
+    page.Controls.Theme:OnChanged(function(v)
+        window:SetTheme(v)
+        if page._syncColors then page:_syncColors()end
+    end)
+
+    local mats=Fawn.SurfaceStyles or{"Solid","Frosted","Acrylic","Smoke","Clear"}
+    page.Controls.SurfaceStyle=style:Dropdown(
+        "Surface Material",
+        mats,
+        indexOf(mats,window.GetSurfaceStyle and window:GetSurfaceStyle()or"Solid")or 1,
+        {noConfig=true}
+    )
+    page.Controls.SurfaceStyle:OnChanged(function(v)
+        if window.SetSurfaceStyle then window:SetSurfaceStyle(v)end
+        if page.Controls.Glass then page.Controls.Glass:Set(window:GetLiquidGlass(),true)end
+    end)
+
+    page.Controls.Glass=style:Toggle("Liquid Glass",window:GetLiquidGlass(),{noConfig=true})
+    page.Controls.Glass:OnChanged(function(v)
+        window:SetLiquidGlass(v)
+        if page.Controls.SurfaceStyle and window.GetSurfaceStyle then
+            page.Controls.SurfaceStyle:Set(window:GetSurfaceStyle(),true)
+        end
+    end)
+
+    page.Controls.GlassOpacity=style:Slider(
+        "Glass Opacity",18,100,round(window:GetGlassOpacity()*100),
+        {noConfig=true,format=function(v)return round(v).."%"end}
+    )
+    page.Controls.GlassOpacity:OnChanged(function(v)window:SetGlassOpacity(v/100)end)
+
+    if window.GetGlassTint then
+        page.Controls.GlassTint=style:ColorPicker("Glass Tint",window:GetGlassTint(),{noConfig=true})
+        page.Controls.GlassTint:OnChanged(function(v)window:SetGlassTint(v)end)
+    end
+    if window.GetGlassTintStrength then
+        page.Controls.GlassTintStrength=style:Slider(
+            "Tint Strength",0,65,round(window:GetGlassTintStrength()*100),
+            {noConfig=true,format=function(v)return round(v).."%"end}
+        )
+        page.Controls.GlassTintStrength:OnChanged(function(v)window:SetGlassTintStrength(v/100)end)
+    end
+    if window.SetSurfaceHighlights then
+        page.Controls.SurfaceHighlights=style:Toggle("Glass Highlights",window.surfaceHighlights~=false,{noConfig=true})
+        page.Controls.SurfaceHighlights:OnChanged(function(v)window:SetSurfaceHighlights(v)end)
+    end
+
+    windowFx:AddLabel("Window geometry and background effects.",{muted=true,wrap=true,maxLines=2})
+    page.Controls.Scale=windowFx:Slider(
+        "UI Scale",55,165,round(window:GetScale()*100),
+        {noConfig=true,format=function(v)return round(v).."%"end}
+    )
+    page.Controls.Scale:OnChanged(function(v)window:SetScale(v/100)end)
+
+    page.Controls.BackgroundBlur=windowFx:Toggle("Background Blur",window.backgroundBlur==true,{noConfig=true})
+    page.Controls.BackgroundBlur:OnChanged(function(v)window:SetBackgroundBlur(v)end)
+
+    page.Controls.BackgroundSnow=windowFx:Toggle("Background Snow",window.backgroundSnow==true,{noConfig=true})
+    page.Controls.BackgroundSnow:OnChanged(function(v)window:SetBackgroundSnow(v)end)
+
+    local corners=Fawn.CornerPresets or{"Square","Tight","Soft","Round"}
+    local cornerDefault="Round"
+    page.Controls.CornerPreset=windowFx:Dropdown("Corner Preset",corners,indexOf(corners,cornerDefault)or 1,{noConfig=true})
+    page.Controls.CornerPreset:OnChanged(function(v)if window.SetCornerPreset then window:SetCornerPreset(v)end end)
+
+    if window.SetRadiusScale then
+        page.Controls.RadiusScale=windowFx:Slider(
+            "Radius Scale",45,165,round((window.radiusScale or 1)*100),
+            {noConfig=true,format=function(v)return round(v).."%"end}
+        )
+        page.Controls.RadiusScale:OnChanged(function(v)window:SetRadiusScale(v/100)end)
+    end
+
+    page.Controls.Outline=windowFx:ColorPicker("Outline Color",window:GetOutlineColor(),{noConfig=true})
+    page.Controls.Outline:OnChanged(function(v)
+        window:SetOutlineColor(v)
+        window:SetThemeColor("outline",v,true)
+    end)
+
+    page.Controls.OutlineStrength=windowFx:Slider(
+        "Outline Thickness",25,300,round(window:GetOutlineStrength()*100),
+        {noConfig=true,format=function(v)return format("%.2fx",v/100)end}
+    )
+    page.Controls.OutlineStrength:OnChanged(function(v)window:SetOutlineStrength(v/100)end)
+
+    if window.SetOutlineOpacity then
+        page.Controls.OutlineOpacity=windowFx:Slider(
+            "Outline Opacity",15,100,round((window.outlineOpacity or 1)*100),
+            {noConfig=true,format=function(v)return round(v).."%"end}
+        )
+        page.Controls.OutlineOpacity:OnChanged(function(v)window:SetOutlineOpacity(v/100)end)
+    end
+
+    windowFx:AddButtonPair(
+        "Center UI",function()window:Center()end,
+        "Default Size",function()window:SetSize(REF.Width,REF.Height)end
+    )
+
+    behavior:AddLabel("Input, animation and scrolling behavior.",{muted=true,wrap=true,maxLines=2})
+    page.Controls.Smooth=behavior:Toggle("Smooth Scrolling",window.smoothScroll,{noConfig=true})
+    page.Controls.Smooth:OnChanged(function(v)window:SetSmoothScroll(v)end)
+
+    page.Controls.Anim=behavior:Toggle("Animations",window.animations,{noConfig=true})
+    page.Controls.Anim:OnChanged(function(v)window:SetAnimations(v)end)
+
+    if window.SetMotionStyle then
+        local motions=Fawn.MotionStyles or{"Off","Minimal","Smooth","Snappy","Fluid"}
+        page.Controls.MotionStyle=behavior:Dropdown(
+            "Animation Style",motions,indexOf(motions,window.motionStyle or"Smooth")or 1,{noConfig=true}
+        )
+        page.Controls.MotionStyle:OnChanged(function(v)window:SetMotionStyle(v)end)
+    end
+
+    page.Controls.MotionSpeed=behavior:Slider("Animation Speed",4,30,round(window.animationSpeed or 10),{noConfig=true})
+    page.Controls.MotionSpeed:OnChanged(function(v)window:SetAnimationSpeed(v)end)
+
+    if window.SetHoverAnimations then
+        page.Controls.HoverAnimations=behavior:Toggle("Animated Hovers",window.hoverAnimations~=false,{noConfig=true})
+        page.Controls.HoverAnimations:OnChanged(function(v)window:SetHoverAnimations(v)end)
+    end
+    if window.SetSwitchAnimations then
+        page.Controls.SwitchAnimations=behavior:Toggle("Animated Switches",window.switchAnimations~=false,{noConfig=true})
+        page.Controls.SwitchAnimations:OnChanged(function(v)window:SetSwitchAnimations(v)end)
+    end
+
+    page.Controls.ScrollSpeed=behavior:Slider("Scroll Speed",1,30,window:GetScrollSpeed(),{noConfig=true})
+    page.Controls.ScrollSpeed:OnChanged(function(v)window:SetScrollSpeed(v)end)
+
+    local np=indexOf(Fawn.NotificationPositions,window:GetNotificationPosition())or 4
+    page.Controls.Notifications=behavior:Dropdown("Notification Corner",Fawn.NotificationPositions,np,{noConfig=true})
+    page.Controls.Notifications:OnChanged(function(v)window:SetNotificationPosition(v)end)
+
+    page.Controls.MenuKey=behavior:Keybind(
+        "Menu Key",window.toggleKey,
+        {label=window.toggleLabel,mode="Toggle",keyboardOnly=true,keybindList=false,noConfig=true}
+    )
+    page.Controls.MenuKey:OnKeyChanged(function(k,l)window:SetToggleKey(k,l)end)
+
+    profile:AddLabel("Identity and image assets used by the menu.",{muted=true,wrap=true,maxLines=2})
+    page.Controls.ProfileName=profile:Input("Username",window.profileName,{placeholder="User",noConfig=true})
+    page.Controls.ProfileName:OnChanged(function(v)window:SetProfileName(v)end)
+
+    page.Controls.ProfileSub=profile:Input("Profile Subtitle",window.profileSubtitle,{placeholder="Developer",noConfig=true})
+    page.Controls.ProfileSub:OnChanged(function(v)window:SetProfileSubtitle(v)end)
+
+    local function imageOpts(kind,empty)
+        local q=Fawn:ListStorage(kind)
+        if #q==0 then return{empty}end
+        return q
+    end
+
+    profile:AddSeparator("PROFILE PICTURE")
+    page.Controls.ProfileBrowser=profile:Dropdown(
+        "Profile Picture",imageOpts("ProfilePictures","(no profile pictures)"),1,{noConfig=true}
+    )
+    profile:AddButtonPair(
+        "Apply Picture",function()
+            local v=page.Controls.ProfileBrowser:Get()
+            local ok,err=window:ApplyProfileImage(v)
+            window:Notify(ok and("Applied "..tostring(v))or("Picture failed: "..tostring(err or"unknown error")),
+                {title="PROFILE PICTURE",duration=4})
+        end,
+        "Clear Avatar",function()window:ClearProfileImage()end
+    )
+
+    profile:AddSeparator("BRAND")
+    page.Controls.Brand=profile:Input("Brand Title",window.brand,{noConfig=true})
+    page.Controls.Brand:OnChanged(function(v)window.brand=v end)
+    page.Controls.Subtitle=profile:Input("Brand Subtitle",window.subtitle,{noConfig=true})
+    page.Controls.Subtitle:OnChanged(function(v)window.subtitle=v end)
+
+    page.Controls.LogoBrowser=profile:Dropdown(
+        "Logo Picture",imageOpts("LogoPictures","(no logo pictures)"),1,{noConfig=true}
+    )
+    profile:AddButtonPair(
+        "Apply Logo",function()
+            local v=page.Controls.LogoBrowser:Get()
+            local ok,err=window:ApplyLogoImage(v)
+            window:Notify(ok and("Applied "..tostring(v))or("Logo failed: "..tostring(err or"unknown error")),
+                {title="LOGO",duration=4})
+        end,
+        "Clear Logo",function()window:ClearLogoImage()end
+    )
+    profile:AddButton("Refresh Images",function()page:RefreshBrowsers()end)
+
+    colors:AddLabel(
+        "Fine tune the full palette. Theme changes refresh these values automatically.",
+        {controlColumn=1,controlRow=1,span=2,muted=true,wrap=true,maxLines=2}
+    )
+
+    local colorDefs={
+        {"Accent","accent"},{"Main Background","menuBg"},
+        {"Card Background","card"},{"Control Background","control"},
+        {"Control Hover","controlHover"},{"Active Item","activeItem"},
+        {"Text","text"},{"Muted Text","muted"},
+        {"Navigation Text","navText"},{"Popup","popup"},
+        {"Icon","icon"},{"Chevron","chev"},
+        {"Toggle Track","toggleTrack"},{"Toggle Knob","toggleKnob"},
+        {"Logo Background","logoBg"},{"Logo Foreground","logoFg"},
+        {"Avatar","avatar"},{"Avatar Dark","avatarDark"},
+        {"Separator Line","line"}
+    }
+
+    page.ColorControls={}
+    for i,d in ipairs(colorDefs)do
+        local label,key=d[1],d[2]
+        local col=((i-1)%2)+1
+        local row=floor((i-1)/2)+2
+        local cp=colors:ColorPicker(label,window:_color(key),{
+            noConfig=true,controlColumn=col,controlRow=row
+        })
+        cp:OnChanged(function(v)window:SetThemeColor(key,v,true)end)
+        page.ColorControls[key]=cp
+    end
+
+    function page:_syncColors()
+        for k,c in pairs(self.ColorControls or{})do
+            c:Set(window:_color(k),true)
+        end
+        if self.Controls.Outline then
+            self.Controls.Outline:Set(window:GetOutlineColor(),true)
+        end
+    end
+
+    local colorButtonRow=floor((#colorDefs-1)/2)+3
+    colors:AddButtonPair(
+        "Reset Appearance",function()
+            window:SetTheme("Modern Blue")
+            window:SetScale(1)
+            window:SetLiquidGlass(false)
+            window:SetOutlineStrength(1)
+            window:SetBackgroundBlur(false)
+            window:SetBackgroundSnow(false)
+            if window.ResetPolish then window:ResetPolish()end
+            if page.Controls.Theme then
+                page.Controls.Theme:Set(indexOf(Fawn.ThemeNames,window:GetThemeName())or 1,true)
+            end
+            if page.Controls.BackgroundBlur then page.Controls.BackgroundBlur:Set(false,true)end
+            if page.Controls.BackgroundSnow then page.Controls.BackgroundSnow:Set(false,true)end
+            page:_syncColors()
+        end,
+        "Refresh Palette",function()page:_syncColors()end,
+        {controlColumn=1,controlRow=colorButtonRow,span=2}
+    )
+
+    local cfgs=Fawn:ListStorage("Configs")
+    if #cfgs==0 then cfgs={"(no config files)"}end
+    page.Controls.ConfigBrowser=config:Dropdown("Config File",cfgs,1,{noConfig=true})
+    page.Controls.ConfigBrowser:OnChanged(function(v)
+        if v and v:sub(1,1)~="("then page:SetConfigPath(v)end
+    end)
+    page.Controls.ConfigName=config:Input(
+        "New Config Name","default.lua",
+        {placeholder="default.lua",noConfig=true,maxLength=96}
+    )
+
+    config:AddButtonPair(
+        "Save As",function()
+            page:SetConfigPath(page.Controls.ConfigName:Get())
+            page:SaveConfig()
+            page:RefreshBrowsers()
+        end,
+        "Load Selected",function()
+            local v=page.Controls.ConfigBrowser:Get()
+            if v and v:sub(1,1)~="("then
+                page:SetConfigPath(v)
+                page:LoadConfig()
+            end
+        end
+    )
+    config:AddButtonPair(
+        "Refresh Files",function()page:RefreshBrowsers()end,
+        "Show Path",function()page:ShowConfigPath()end
+    )
+    config:AddSeparator("IN-MEMORY")
+    config:AddButtonPair(
+        "Save Current",function()
+            window:SaveNamedConfig(window.configName)
+            window:Notify("Named config saved",{title="CONFIG"})
+        end,
+        "Duplicate",function()
+            local n=window:DuplicateNamedConfig()
+            window:Notify("Created "..n,{title="CONFIG"})
+        end
+    )
+    config:AddValue("Configs Folder",function()local p=Fawn:GetStoragePaths();return p.Configs or"Fawn Modern/configs"end,{muted=true,wrap=true,maxLines=2})
+
+    diagnostics:AddValue("Paint Frames",function()return Fawn:GetPaintCount()end)
+    diagnostics:AddValue("Paint Errors",function()
+        local n=Fawn:GetPaintErrors()
+        return tostring(n)
+    end)
+    diagnostics:AddValue("Draw Errors",function()return tostring(E.drawErrors or 0)end)
+    diagnostics:AddValue("Window Size",function()
+        local w,h=window:GetSize()
+        return round(w).." × "..round(h)
+    end)
+    diagnostics:AddValue("UI Scale",function()return round(window:GetScale()*100).."%"end)
+    diagnostics:AddValue("Active Theme",function()return window:GetThemeName()end,{accent=true})
+    diagnostics:AddButton("Test Notification",function()
+        window:Notify("Settings page is live and working.",{title="FAWN SETTINGS"})
+    end)
+
+    local perfModes={"Peak","Balanced","Safe"}
+    page.Controls.PerformanceMode=performance:Dropdown("Performance Mode",perfModes,indexOf(perfModes,Fawn:GetPerformanceMode())or 1,{noConfig=true,controlColumn=1,controlRow=1})
+    page.Controls.PerformanceMode:OnChanged(function(v)
+        Fawn:SetPerformanceMode(v)
+        if page.Controls.FastDraw then page.Controls.FastDraw:Set(Fawn:GetFastDraw(),true)end
+        if page.Controls.SnowBudget then page.Controls.SnowBudget:Set(Fawn:GetSnowParticleCount(),true)end
+    end)
+    page.Controls.FastDraw=performance:Toggle("Fast Draw",Fawn:GetFastDraw(),{noConfig=true,controlColumn=2,controlRow=1})
+    page.Controls.FastDraw:OnChanged(function(v)Fawn:SetFastDraw(v)end)
+    page.Controls.SnowBudget=performance:Slider("Snow Particle Budget",0,120,Fawn:GetSnowParticleCount(),{noConfig=true,step=1,controlColumn=1,controlRow=2})
+    page.Controls.SnowBudget:OnChanged(function(v)Fawn:SetSnowParticleCount(v)end)
+    performance:AddValue("Text / Fit Cache",function()local q=Fawn:GetPerformanceStats();return tostring(q.measureCache or 0).." / "..tostring(q.fitCache or 0)end,{controlColumn=2,controlRow=2})
+    performance:AddValue("Color Cache",function()local q=Fawn:GetPerformanceStats();return tostring(q.rgbCache or 0)end,{controlColumn=1,controlRow=3})
+    performance:AddValue("Runtime Errors",function()local q=Fawn:GetPerformanceStats();return tostring(q.paintErrors or 0).." paint / "..tostring(q.drawErrors or 0).." draw"end,{controlColumn=2,controlRow=3})
+    performance:AddLabel("Peak is the default. Balanced raises the snow budget. Safe restores per-draw protected calls and full key polling for debugging unusual runtime issues.",{controlColumn=1,controlRow=4,span=2,wrap=true,maxLines=3})
+
+    function page:RefreshBrowsers()
+        local function apply(ctrl,list,empty)
+            local q=list
+            if #q==0 then q={empty}end
+            if ctrl then ctrl:SetOptions(q,{preserve="text"})end
+        end
+        apply(self.Controls.ConfigBrowser,Fawn:ListStorage("Configs"),"(no config files)")
+        apply(self.Controls.ProfileBrowser,Fawn:ListStorage("ProfilePictures"),"(no profile pictures)")
+        apply(self.Controls.LogoBrowser,Fawn:ListStorage("LogoPictures"),"(no logo pictures)")
+        return self
+    end
+
+    page:CaptureDefaults()
+    window.settingsPage=page
+    page:RefreshBrowsers()
+    return page
+end
+
+function Fawn:SetPerformanceMode(mode)
+    local key=lower(tostring(mode or"Peak"));local P=self.Performance
+    if key=="safe"then P.Mode="Safe";P.FastDraw=false;P.SmartKeyPolling=false;P.SnowParticles=70;P.ImageRetryMs=2500
+    elseif key=="balanced"then P.Mode="Balanced";P.FastDraw=true;P.SmartKeyPolling=true;P.SnowParticles=56;P.ImageRetryMs=4000
+    else P.Mode="Peak";P.FastDraw=true;P.SmartKeyPolling=true;P.SnowParticles=48;P.ImageRetryMs=5000 end
+    for _,w in ipairs(E.windows)do if w and not w.destroyed then w._snowFix=nil end end
+    return self
+end
+function Fawn:GetPerformanceMode()return self.Performance.Mode end
+function Fawn:SetSnowParticleCount(v)self.Performance.SnowParticles=clamp(floor(tonumber(v)or self.Performance.SnowParticles),0,120);for _,w in ipairs(E.windows)do if w and not w.destroyed then w._snowFix=nil end end;return self end
+function Fawn:GetSnowParticleCount()return self.Performance.SnowParticles end
+function Fawn:SetFastDraw(v)self.Performance.FastDraw=v~=false;return self end
+function Fawn:GetFastDraw()return self.Performance.FastDraw==true end
+function Fawn:GetPerformanceStats()local P=self.Performance;return{mode=P.Mode,fastDraw=P.FastDraw,smartKeyPolling=P.SmartKeyPolling,snowParticles=P.SnowParticles,imageRetryMs=P.ImageRetryMs,measureCache=measureCount,fitCache=P.FitCount,rgbCache=P.RGBCount,windows=#E.windows,overlays=#E.overlays,notifications=#E.notifications,paintCount=E.paintCount,paintErrors=E.paintErrors,drawErrors=E.drawErrors}end
+
+Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
+Fawn.DynamicCapabilities.PeakPerformanceCore=true
+Fawn.DynamicCapabilities.SmartKeyPolling=true
+Fawn.DynamicCapabilities.ColorObjectCache=true
+Fawn.DynamicCapabilities.TextLayoutCache=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.Performance="Peak mode uses direct validated draw dispatch, cached Color3/text geometry, smart key polling, frame-value caching, bounded image retries and a reduced snow budget"
+
+Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
+Fawn.DynamicCapabilities.PremadeSettingsPage=true
+Fawn.DynamicCapabilities.AccessoryPopupModalChildren=true
+Fawn.DynamicCapabilities.AccessoryColorPicker=true
+Fawn.DynamicCapabilities.AccessorySliderNumericEntry=true
+Fawn.DynamicCapabilities.SliderManualOverflow=true
+Fawn.DynamicCapabilities.PopupTriggerToggle=true
+Fawn.DynamicCapabilities.CaretPixelAlignment=true
+Fawn.DynamicCapabilities.AccessoryColorPopupInteractive=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.SettingsPage="polished live style/effects/motion/profile/colors/config/diagnostics page"
+Fawn.Runtime.AccessoryPopupFinal="nested dropdown/color/key menus are modal and cannot click through"
+Fawn.Runtime.SliderNumericEntry="typed values may exceed visual range unless Control:SetClamp(true) is enabled"
+Fawn.Runtime.PopupTriggerToggle="dropdowns, color pickers and three-dot accessory menus close when their trigger is clicked again"
+Fawn.Runtime.CaretPixelAlignment="caret width uses draw.Text rounded font size + floored text origin; clicking text places the caret at the nearest character"
+
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.ResponsiveSecondaryWindows=true
 Fawn.DynamicCapabilities.PersistentESPElementCapture=true
 Fawn.DynamicCapabilities.DockedESPDragOwnership=true
+Fawn.DynamicCapabilities.BackgroundEffects=true
 Fawn.DynamicCapabilities.ManagedImageFallbackDraw=true
 Fawn.Runtime=Fawn.Runtime or{}
-Fawn.Runtime.ESPElementDrag="original Fawn cursor-follow slot drag + release commit + docked parent-window pointer ownership"
+Fawn.Runtime.ESPElementDrag="docked ESP stays owned by its parent Window while dragging; standalone ESP stays overlay-owned"
 Fawn.Runtime.SecondaryUI="responsive topbar + automatic narrow-column reflow + bounded panel header"
 Fawn.Runtime.ManagedImages="sandbox-normalized paths + LoadImage cache + 5-arg draw.Image compatibility + timed retry"
+
+Fawn.Runtime.BackgroundEffects="original Fawn-style dim backdrop + lightweight snow"
+
+-- ============================================================================
+-- 10.x final hardening: modal accessories, clean optional ESP, neutral assets,
+-- and Peak hot-path rendering.
+-- ============================================================================
+
+Fawn.Performance.ColorPickerCols=14
+Fawn.Performance.ColorPickerRows=10
+Fawn.Performance.ColorPickerHueSteps=24
+Fawn.Performance.ColorPickerAlphaSteps=48
+Fawn.Performance.PeakStaticSurfaces=true
+Fawn.Performance.ReuseControlRects=true
+
+-- In Peak + Solid mode, skip the expensive per-surface animation/material
+-- machinery. Widget hover states still work because controls select their own
+-- theme role (control/controlHover/activeItem) before reaching this function.
+local ultraFillBase=Window._fill
+function Window:_fill(role,x,y,w,h,key,r,a)
+    local P=Fawn.Performance
+    if P.Mode=="Peak"and P.PeakStaticSurfaces~=false and not self.liquidGlass and(self.surfaceStyle==nil or self.surfaceStyle=="Solid")then
+        local c=self:_color(key)
+        local aa=a
+        if aa==nil then aa=alphaFor(self,role,c[4]or 255)end
+        rect(x,y,w,h,c,max(0,(tonumber(r)or 0)*(self.radiusScale or 1)),aa)
+        return
+    end
+    return ultraFillBase(self,role,x,y,w,h,key,r,a)
+end
+
+local ultraOutBase=Window._out
+function Window:_out(x,y,w,h,r,t,c,a)
+    local P=Fawn.Performance
+    if P.Mode=="Peak"and P.PeakStaticSurfaces~=false and not self.liquidGlass and(self.surfaceStyle==nil or self.surfaceStyle=="Solid")then
+        local rr=max(0,(tonumber(r)or 0)*(self.radiusScale or 1))
+        local th=max(.75,(tonumber(t)or self.borderThickness or 1)*(self.outlineStrength or 1))
+        local aa=clamp((tonumber(a)or 255)*(self.outlineOpacity or 1),0,255)
+        outline(x,y,w,h,c or self.outlineColor or self:_color("outline"),rr,aa,th)
+        return
+    end
+    return ultraOutBase(self,x,y,w,h,r,t,c,a)
+end
+
+-- Reuse one rectangle per control and walk Section.controls in authored order.
+-- This removes the per-frame rows={} allocation + table.sort from every visible
+-- Section while preserving exact authored control ordering.
+function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
+    local sec=box.section
+    local s=self.scale
+    local cardTop=box.cardY
+    local cardBottom=cardTop+box.cardH
+    local clipL=max(bodyLeft or box.x,box.x)
+    local clipR=min(bodyRight or(box.x+box.w),box.x+box.w)
+    local clipT=max(bodyTop,cardTop)
+    local clipB=min(bodyBottom,cardBottom)
+    if clipB<=clipT or clipR<=clipL then return end
+
+    if sec._scrollDrag then
+        if Input.left and sec.maxScroll>0 then
+            local rr=snapRatio96((Input.my-sec._scrollDrag.top-sec._scrollDrag.off)/max(1,sec._scrollDrag.span))
+            sec.scrollTarget=rr*sec.maxScroll
+            sec.scroll=sec.scrollTarget
+        else
+            sec._scrollDrag=nil
+            sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)
+        end
+    else
+        sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)
+    end
+
+    local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5)
+    self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
+
+    local offset=sec.scroll or 0
+    for _,c in ipairs(sec.controls or{})do
+        local base=box.layouts[c]
+        if base and alive(c)and visibilityPass(c)then
+            local r=c._fawnFastRect
+            if not r then r={};c._fawnFastRect=r end
+            r.x,r.y,r.w,r.h=base.x,base.y-offset,base.w,base.h
+            if r.y>=clipT-.25 and r.y+r.h<=clipB+.25 and r.x>=clipL-.25 and r.x+r.w<=clipR+.25 then
+                self:_drawControl(c,r,clipT,clipB)
+            end
+        end
+    end
+
+    if sec.columnDividers==true and sec.columns and sec.columns>1 then
+        local gap=(sec.controlGap or 12)*s
+        local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s)
+        local cw=(usable-gap*(sec.columns-1))/sec.columns
+        for i=1,sec.columns-1 do
+            local xx=box.x+i*cw+(i-.5)*gap
+            local y1=max(clipT+8*s,cardTop+8*s)
+            local y2=min(clipB-8*s,cardBottom-8*s)
+            if y2>y1 then line(xx,y1,xx,y2,self:_color("line"),1,14)end
+        end
+    end
+
+    if sec.maxScroll>1 then
+        local gutter=REF.SectionScrollbarGutter*s
+        local gx=box.x+box.w-gutter
+        local tx=gx+gutter*.5
+        local top=clipT+9*s
+        local bh=max(1,clipB-clipT-18*s)
+        local thumb=max(28*s,bh*(box.cardH/max(box.cardH,box.contentH)))
+        local span=max(1,bh-thumb)
+        local ratio=sec.maxScroll>0 and snapRatio96((sec.scroll or 0)/sec.maxScroll)or 0
+        local ty=top+span*ratio
+        local trackHover=self:_hit(gx,clipT,gutter,clipB-clipT)
+        local thumbHover=self:_hit(gx,ty-3*s,gutter,thumb+6*s)
+        local active=sec._scrollDrag~=nil
+        if trackHover or active then rect(tx-1*s,top,2*s,bh,self:_color("controlHover"),1*s,88)end
+        rect(tx-((active or thumbHover)and 2*s or 1.5*s),ty,(active or thumbHover)and 4*s or 3*s,thumb,self:_color((active or thumbHover)and"accent"or"outline"),2*s,(active or thumbHover)and 255 or 180)
+        if Input.click and not self._consumed and not self:_hasPopup()and thumbHover then
+            sec._scrollDrag={top=top,span=span,off=Input.my-ty}
+            self:_consume()
+        end
+    else
+        sec._scrollDrag=nil
+        sec.scroll,sec.scrollTarget=0,0
+    end
+
+    self:_out(clipL,clipT,clipR-clipL,clipB-clipT,rr,.82,self:_color("outline"),112)
+    local titleY=box.y+7*s
+    if titleY>=bodyTop-20*s and titleY<=bodyBottom and box.x>=bodyLeft-1 and box.x<=(bodyRight or box.x+box.w)then
+        textC(fit(upper(sec.name),max(20,box.w-44*s),14*s,"Verdana"),box.x+22*s,titleY,self:_color("muted"),14*s,"Verdana")
+    end
+end
+
+-- Popups get exclusive pointer access over the page underneath them. This is
+-- stronger than relying on every individual control to remember `_hasPopup()`.
+local ultraDrawContent=Window._drawContent
+function Window:_drawContent()
+    local hadPopup=self:_hasPopup()
+    if not hadPopup then return ultraDrawContent(self)end
+
+    -- The normal content pass is pointer-silent while a popup is open. Handle
+    -- the one legitimate content-layer click here: clicking the same outer
+    -- three-dot trigger closes the accessory menu. The click is still suppressed
+    -- for the rest of this frame so the underlying control cannot reopen it.
+    if self.extraPopup and Input.click and not self._consumed then
+        local p=self.extraPopup
+        if p.triggerX and p.triggerY and p.triggerW and p.triggerH and self:_hit(p.triggerX,p.triggerY,p.triggerW,p.triggerH)then
+            self.extraPopup=nil
+            self.openDrop=nil;self.colorPopup=nil;self.colorMenu=nil;self.keyMenu=nil
+            self:_consume()
+        end
+    end
+
+    local click,rightClick,left,right,released,rightReleased,wheel=
+        Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel
+    Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=false,false,false,false,false,false,0
+    local ok,a,b,c,d=pcall(ultraDrawContent,self)
+    Input.click,Input.rightClick,Input.left,Input.right,Input.released,Input.rightReleased,Input.wheel=
+        click,rightClick,left,right,released,rightReleased,wheel
+    if not ok then error(a)end
+    return a,b,c,d
+end
+
+local function ultraAccessoryRows(parent)
+    local n=0
+    local k=parent and parent.keybind
+    if k and not k.accessoryOnly then n=n+1 end
+    local controls=parent and parent.extraSection and parent.extraSection.controls
+    if controls then for _,c in ipairs(controls)do if alive(c)and visibilityPass(c)then n=n+1 end end end
+    return n
+end
+
+local function ultraSliderCaret(win,ed,shown,vx,vw,cy,C)
+    local tw=measure(shown,C.valFont*win.scale,"Verdana")
+    local ex=floor(vx+(vw-tw)*.5)
+    textC(shown,ex,cy,win:_color("text"),C.valFont*win.scale,"Verdana")
+    if(nowMs()-(ed.blink or 0))%900<450 then
+        local cursor=clamp(ed.cursor or#shown,0,#shown)
+        local pre=sub(shown,1,cursor)
+        local preW=caretWidth(pre,C.valFont*win.scale,"Verdana")
+        local cx=clamp(ex+floor(preW+.5),floor(vx+2*win.scale),floor(vx+vw-2*win.scale))
+        caretLine(cx,cy,shown,C.valFont*win.scale,"Verdana",win:_color("text"),255)
+    end
+end
+
+-- Final accessory row implementation. Child dropdown/color/key menus are true
+-- nested modals; numeric slider boxes are editable by left OR right click.
+local function ultraAccessoryRow(win,c,x,y,w,h,C,canInteract)
+    local s=win.scale
+    local left=x+C.padL*s
+    local right=x+w-C.padR*s
+    local cy=y+h*.5
+    local labelW=max(30*s,w*.40)
+    if c.type~="button"and c.type~="label"and c.type~="separator"then
+        textC(fit(c.label or"",labelW,C.font*s,"Verdana"),left,cy,win:_color("text"),C.font*s,"Verdana")
+    end
+
+    if c.type=="toggle"then
+        local tw,th=C.togW*s,C.togH*s
+        local tx,ty=right-tw,cy-C.togH*s*.5
+        local on=c.value==true
+        rect(tx,ty,tw,th,on and win:_color("accent")or win:_color("toggleTrack"),th*.5,255)
+        local kp=(th-C.knob*s)*.5
+        circle(on and(tx+tw-kp-C.knob*s*.5)or(tx+kp+C.knob*s*.5),cy,C.knob*s*.5,win:_color("white"),255)
+        if canInteract and Input.click and not win._consumed and win:_hit(tx,ty,tw,th)then c:Set(not on);win:_consume()end
+        return
+    end
+
+    if c.type=="slider"then
+        local editing=win.sliderEdit and win.sliderEdit.control==c
+        local display=win:_sliderDisplay(c,c.value or c.min)
+        local shown=editing and tostring(win.sliderEdit.text or"")or display
+        local textW=measure(shown,C.valFont*s,"Verdana")
+        local vw=max((editing and 78 or 54)*s,textW+C.valPad*2*s)
+        local vx=right-vw
+        local vh=C.valH*s
+        local vy=cy-vh*.5
+        local sx=left+labelW
+        local sw=max(34*s,vx-C.sGap*s-sx)
+        rect(sx,cy-2*s,sw,4*s,win:_color("control"),2*s,255)
+        local range=max(.00001,c.max-c.min)
+        local q=clamp((clamp(c.value or c.min,c.min,c.max)-c.min)/range,0,1)
+        local kx=sx+q*sw
+        rect(sx,cy-2*s,max(0,kx-sx),4*s,win:_color("accent"),2*s,255)
+        circle(kx,cy,max(4*s,C.sKnob*s*.32),win:_color("white"),255)
+
+        local valueHover=win:_hit(vx,vy,vw,vh)
+        win:_fill("control",vx,vy,vw,vh,(editing or valueHover)and"controlHover"or"control",C.valR*s)
+        if editing then
+            win:_out(vx,vy,vw,vh,C.valR*s,1,win:_color("accent"),255)
+            ultraSliderCaret(win,win.sliderEdit,shown,vx,vw,cy,C)
+        else
+            textC(display,vx+(vw-textW)*.5,cy,win:_color("text"),C.valFont*s,"Verdana")
+        end
+
+        if c._accessoryDrag then
+            if Input.left then c:Set(c.min+clamp((Input.mx-sx)/max(1,sw),0,1)*(c.max-c.min))
+            else c._accessoryDrag=nil end
+        end
+
+        if canInteract and not win._consumed then
+            if (Input.click or Input.rightClick)and valueHover then
+                if not editing then win:_startSliderEdit(c,{vx,vy,vw,vh})end
+                local ed=win.sliderEdit
+                if ed and ed.control==c then
+                    local txt=tostring(ed.text or"")
+                    local tw=measure(txt,C.valFont*s,"Verdana")
+                    local tx=floor(vx+(vw-tw)*.5)
+                    local localX=clamp(Input.mx-tx,0,max(0,tw))
+                    local best,bestDist=0,abs(localX)
+                    for p=1,#txt do
+                        local pw=caretWidth(sub(txt,1,p),C.valFont*s,"Verdana")
+                        local dist=abs(localX-pw)
+                        if dist<=bestDist then best,bestDist=p,dist else break end
+                    end
+                    ed.cursor=best;ed.blink=nowMs()
+                end
+                win:_consume()
+            elseif Input.click and win:_hit(sx,cy-15*s,sw,30*s)and not editing then
+                c._accessoryDrag=true
+                c:Set(c.min+clamp((Input.mx-sx)/max(1,sw),0,1)*(c.max-c.min))
+                win:_consume()
+            end
+        end
+        return
+    end
+
+    if c.type=="dropdown"or c.type=="multiselect"then
+        local fw=min(148*s,max(86*s,w*.48))
+        local fh=C.ddH*s
+        local fx,fy=right-fw,cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        local opened=win.openDrop and win.openDrop.control==c
+        win:_fill("control",fx,fy,fw,fh,(hov or opened)and"controlHover"or"control",C.ddR*s)
+        local textv=c.type=="multiselect"and c:GetSummary()or tostring(c:Get()or"None")
+        textC(fit(textv,fw-34*s,C.ddFont*s,"Verdana"),fx+C.ddPadL*s,cy,win:_color("text"),C.ddFont*s,"Verdana")
+        chevDown(fx+fw-C.ddPadR*s-C.chev*s*.5,cy,C.chev*s,win:_color("chev"),opened)
+        if (canInteract or opened)and Input.click and not win._consumed and hov then
+            if opened then win.openDrop=nil else win:_openDropdown(c,fx,fy,fw,fh);win.openDrop.accessoryParent=win.extraPopup and win.extraPopup.control end
+            win:_consume()
+        end
+        return
+    end
+
+    if c.type=="color"then
+        local own=(win.colorPopup and win.colorPopup.control==c)or(win.colorMenu and win.colorMenu.control==c)
+        win:_drawColorChip(c,right,cy,C,canInteract or own,true)
+        return
+    end
+
+    if c.type=="keybind"then
+        local shown=win:_keyLabel(c)
+        local tw=measure(shown,C.keyFont*s,"Verdana")
+        local fw=min(138*s,max(76*s,tw+C.keyPad*2*s))
+        local fh=C.keyH*s
+        local fx,fy=right-fw,cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        win:_fill("control",fx,fy,fw,fh,hov and"controlHover"or"control",C.keyR*s)
+        textC(shown,fx+(fw-tw)*.5,cy,win.captureBind==c and win:_color("accent")or win:_color("text"),C.keyFont*s,"Verdana")
+        if canInteract and Input.click and not win._consumed and hov then win.captureBind=c;win._captureFrame=E.paintCount;win:_consume()
+        elseif canInteract and Input.rightClick and not win._consumed and hov then win.keyMenu={control=c,x=fx,y=fy+fh+5*s,w=162*s,h=3*C.itemH*s,accessoryParent=win.extraPopup and win.extraPopup.control};win:_consume()end
+        return
+    end
+
+    if c.type=="input"then
+        local fw=min(150*s,max(86*s,w*.48))
+        local fh=C.ddH*s
+        local fx,fy=right-fw,cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        win:_fill("control",fx,fy,fw,fh,hov and"controlHover"or"control",C.ddR*s)
+        local focused=win.inputEdit and win.inputEdit.control==c
+        local raw=tostring(c.value or"")
+        local shown,caret=win:_visibleInputText(c,fw,C)
+        local col=win:_color("text")
+        if raw==""and not focused then shown=tostring(c.placeholder or"");col=win:_color("muted")end
+        local textX=floor(fx+C.ddPadL*s)
+        textC(shown,textX,cy,col,C.ddFont*s,"Verdana")
+        if focused and(nowMs()-(win.inputEdit.blink or 0))%900<450 then
+            local cx=clamp(textX+floor(caret+.5),textX-1,floor(fx+fw-C.ddPadR*s))
+            caretLine(cx,cy,shown,C.ddFont*s,"Verdana",win:_color("accent"),255)
+        end
+        c._inputRect={fx,fy,fw,fh}
+        if canInteract and Input.click and not win._consumed and hov then win:_focusInput(c);win:_consume()end
+        return
+    end
+
+    if c.type=="button"then
+        local bx,bw=left,right-left
+        local bh=max(28*s,h-12*s)
+        local by=cy-bh*.5
+        local hov=win:_hit(bx,by,bw,bh)
+        win:_fill("control",bx,by,bw,bh,hov and"controlHover"or"control",8*s)
+        local label=fit(c.label,bw-18*s,C.font*s,"Verdana")
+        local tw=measure(label,C.font*s,"Verdana")
+        textC(label,bx+(bw-tw)*.5,cy,win:_color("text"),C.font*s,"Verdana")
+        if canInteract and Input.click and not win._consumed and hov then if type(c.fn)=="function"then pcall(c.fn,c)end;win:_consume()end
+        return
+    end
+
+    if c.type=="label"then
+        local lines=wrapText(c.label,max(20,right-left),C.font*s,"Verdana",c.maxLines or 3)
+        local lh=17*s;win:_drawWrapped(lines,left,cy-#lines*lh*.5,win:_color("text"),C.font*s,lh,false)
+    elseif c.type=="separator"then
+        textC(fit(upper(c.label),max(20,right-left),11*s,"Verdana"),left,cy,win:_color("muted"),11*s,"Verdana")
+    end
+end
+
+function Window:_drawExtraPopup()
+    local p=self.extraPopup
+    if not p then return end
+    local parent=p.control
+    if not alive(parent)then self:_closePopups();return end
+
+    local s=self.scale
+    local C=REF.Compact
+    local rowH=C.rowH*s
+    local header=36*s
+    local count=ultraAccessoryRows(parent)
+    p.w=REF.AccessoryWidth*s
+    p.h=header+max(1,count)*rowH+8*s
+    p.anchorY=p.anchorY or p.y-8*s
+    self:_clampPopup(p)
+    self:_popupFrame(p)
+
+    textC("ACCESSORIES",p.x+14*s,p.y+18*s,self:_color("muted"),12*s,"Verdana")
+    local nested=self.openDrop or self.colorPopup or self.colorMenu or self.keyMenu
+    local y=p.y+header
+    local k=parent.keybind
+
+    if k and not k.accessoryOnly then
+        local shown=self:_keyLabel(k)
+        local tw=measure(shown,C.keyFont*s,"Verdana")
+        local fw=min(126*s,max(76*s,tw+C.keyPad*2*s))
+        local fh=C.keyH*s
+        local fx=p.x+p.w-C.padR*s-fw
+        local fy=y+(rowH-fh)*.5
+        local cy=y+rowH*.5
+        local hov=self:_hit(fx,fy,fw,fh)
+        textC("Keybind",p.x+C.padL*s,cy,self:_color("text"),C.font*s,"Verdana")
+        self:_fill("control",fx,fy,fw,fh,hov and"controlHover"or"control",C.keyR*s)
+        textC(shown,fx+(fw-tw)*.5,cy,self.captureBind==k and self:_color("accent")or self:_color("text"),C.keyFont*s,"Verdana")
+        if not nested and Input.click and not self._consumed and hov then self.captureBind=k;self._captureFrame=E.paintCount;self:_consume()
+        elseif not nested and Input.rightClick and not self._consumed and hov then self.keyMenu={control=k,x=fx,y=fy+fh+5*s,w=162*s,h=3*C.itemH*s,accessoryParent=parent};self:_consume()end
+        y=y+rowH
+    end
+
+    local controls=parent.extraSection and parent.extraSection.controls or{}
+    for _,c in ipairs(controls)do
+        if alive(c)and visibilityPass(c)then
+            local ownChild=(self.openDrop and self.openDrop.control==c)or(self.colorPopup and self.colorPopup.control==c)or(self.colorMenu and self.colorMenu.control==c)or(self.keyMenu and self.keyMenu.control==c)
+            ultraAccessoryRow(self,c,p.x,y,p.w,rowH,C,(not nested)or ownChild)
+            y=y+rowH
+        end
+    end
+
+    -- The accessory shell is modal, but a child popup is drawn after it. Never
+    -- consume a click that belongs to that child before the child gets to see it.
+    if not self._consumed and(Input.click or Input.rightClick)and self:_hit(p.x,p.y,p.w,p.h)then
+        if nested then
+            local childInside=false
+            for _,q in ipairs({self.openDrop,self.colorPopup,self.colorMenu,self.keyMenu})do
+                if q then
+                    if q.x and q.y and q.w and q.h and self:_hit(q.x,q.y,q.w,q.h)then childInside=true break end
+                    if q.triggerX and q.triggerY and q.triggerW and q.triggerH and self:_hit(q.triggerX,q.triggerY,q.triggerW,q.triggerH)then childInside=true break end
+                end
+            end
+            if not childInside then
+                self.openDrop=nil;self.colorPopup=nil;self.colorMenu=nil;self.keyMenu=nil
+                self:_consume()
+            end
+        else
+            self:_consume()
+        end
+    end
+end
+
+-- Child color popup: lower draw-call gradient in Peak mode and immediate click
+-- application before drag capture, so a picker works even on runtimes where a
+-- click edge and held-state arrive on different callbacks.
+function Window:_drawColorPopup()
+    local p=self.colorPopup
+    if not p then return end
+    local c=p.control
+    if not alive(c)then self.colorPopup=nil return end
+    local s=self.scale
+    p.w=232*s;p.h=238*s;p.anchorY=p.y-6*s
+    self:_clampPopup(p);self:_popupFrame(p)
+
+    local arr=c.value
+    local hue,sat,val=rgbToHsv92(arr[1],arr[2],arr[3])
+    local svx,svy,svw,svh=p.x+12*s,p.y+39*s,158*s,108*s
+    local hx,hy,hw,hh=p.x+181*s,p.y+39*s,16*s,108*s
+    local ax,ay,aw,ah=p.x+12*s,p.y+169*s,185*s,12*s
+    textC(upper(c.label or"COLOR"),p.x+12*s,p.y+17*s,self:_color("text"),13*s,"Verdana")
+
+    local P=Fawn.Performance
+    local cols=max(8,floor(P.ColorPickerCols or 14))
+    local rows=max(6,floor(P.ColorPickerRows or 10))
+    local hueSteps=max(12,floor(P.ColorPickerHueSteps or 24))
+    local alphaSteps=max(16,floor(P.ColorPickerAlphaSteps or 48))
+    local cw,ch=svw/cols,svh/rows
+
+    for iy=0,rows-1 do
+        local vv=1-iy/max(1,rows-1)
+        for ix=0,cols-1 do
+            local ss=ix/max(1,cols-1)
+            local r,g,b=hsvToRgb92(hue,ss,vv)
+            rect(svx+ix*cw,svy+iy*ch,cw+1,ch+1,{r,g,b,255},0,255)
+        end
+    end
+    self:_out(svx-1*s,svy-1*s,svw+2*s,svh+2*s,4*s,.8,self:_color("outline"),210)
+    local sx,sy=svx+sat*svw,svy+(1-val)*svh
+    circle(sx,sy,3.2*s,self:_color("white"),255)
+    outline(sx-4.2*s,sy-4.2*s,8.4*s,8.4*s,self:_color("black"),4.2*s,190,max(.8,s))
+
+    for i=0,hueSteps-1 do
+        local r,g,b=hsvToRgb92(i/max(1,hueSteps-1),1,1)
+        rect(hx,hy+i*(hh/hueSteps),hw,hh/hueSteps+1,{r,g,b,255},0,255)
+    end
+    self:_out(hx-1*s,hy-1*s,hw+2*s,hh+2*s,3*s,.8,self:_color("outline"),210)
+    rect(hx-2*s,hy+hue*hh-1*s,hw+4*s,2*s,self:_color("white"),1*s,255)
+
+    self:_fill("control",ax,ay,aw,ah,"control",4*s)
+    local segW=aw/alphaSteps
+    for i=0,alphaSteps-1 do
+        local aa=round(i/max(1,alphaSteps-1)*255)
+        rect(ax+i*segW,ay,segW+1,ah,{arr[1],arr[2],arr[3],255},0,aa)
+    end
+    self:_out(ax,ay,aw,ah,4*s,.8,self:_color("outline"),210)
+    local alphaX=ax+(arr[4]or 255)/255*aw
+    rect(alphaX-1*s,ay-1*s,2*s,ah+2*s,self:_color("white"),1*s,255)
+
+    local hex=format("#%02X%02X%02X",arr[1],arr[2],arr[3])
+    local ap=round((arr[4]or 255)/255*100)
+    local fy=p.y+199*s
+    self:_fill("control",p.x+12*s,fy,88*s,23*s,"control",5*s)
+    self:_fill("control",p.x+109*s,fy,88*s,23*s,"control",5*s)
+    self:_out(p.x+12*s,fy,88*s,23*s,5*s,.7,self:_color("outline"),130)
+    self:_out(p.x+109*s,fy,88*s,23*s,5*s,.7,self:_color("outline"),130)
+    local tw=measure(hex,12*s,"Verdana");textC(hex,p.x+56*s-tw*.5,fy+11.5*s,self:_color("text"),12*s,"Verdana")
+    local at=tostring(ap).."%";tw=measure(at,12*s,"Verdana");textC(at,p.x+153*s-tw*.5,fy+11.5*s,self:_color("muted"),12*s,"Verdana")
+
+    local function applyDrag(kind)
+        local h0,s0,v0=rgbToHsv92(arr[1],arr[2],arr[3])
+        local q=copy(arr)
+        if kind=="sv"then
+            s0=clamp((Input.mx-svx)/svw,0,1)
+            v0=1-clamp((Input.my-svy)/svh,0,1)
+            q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
+        elseif kind=="h"then
+            h0=clamp((Input.my-hy)/hh,0,1)
+            q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
+        elseif kind=="a"then
+            q[4]=round(clamp((Input.mx-ax)/aw,0,1)*255)
+        end
+        c:Set(q)
+    end
+
+    if Input.click and not self._consumed then
+        if self:_hit(svx,svy,svw,svh)then p.drag="sv";applyDrag("sv");self:_consume()
+        elseif self:_hit(hx,hy,hw,hh)then p.drag="h";applyDrag("h");self:_consume()
+        elseif self:_hit(ax,ay,aw,ah)then p.drag="a";applyDrag("a");self:_consume()end
+    end
+    if p.drag then
+        if Input.left then applyDrag(p.drag)else p.drag=nil end
+    end
+end
+
+-- Cleaner ESP preview ---------------------------------------------------------
+function ESPPreview:SetEnabled(v)self.visible=v~=false;return self end
+function ESPPreview:GetEnabled()return self.visible~=false end
+function ESPPreview:SetSilhouette(v)self.showSilhouette=v~=false;return self end
+function ESPPreview:GetSilhouette()return self.showSilhouette~=false end
+function ESPPreview:SetStageGuides(v)self.stageGuides=v==true;return self end
+function ESPPreview:GetStageGuides()return self.stageGuides==true end
+
+local ultraESPFactory=Window.ESPPreview
+function Window:ESPPreview(opt)
+    opt=type(opt)=="table"and opt or{}
+    local o=ultraESPFactory(self,opt)
+    o.visible=opt.enabled~=false and opt.visible~=false
+    o.showSilhouette=opt.silhouette~=false
+    o.stageGuides=opt.stageGuides==true
+    o.cleanStyle=opt.cleanStyle~=false
+    if o.docked and o.tab then o.tab.dockedPreview=o end
+    return o
+end
+Window.ESPWindow=Window.ESPPreview
+
+function ESPPreview:_drawBody(x,y,w,h,docked)
+    self:_syncBindings()
+    local win=self.window
+    local s=win and win.scale or 1
+    self.order=self.order or{name=1,healthtext=2,distance=3}
+    local seamless=docked and self.seamless~=false
+    local headerH=seamless and 28*s or 40*s
+    local pad=14*s
+
+    if seamless then
+        textC(upper(self.title or"ESP PREVIEW"),x+18*s,y+7*s,self:_theme("muted"),13*s,"Verdana")
+        y=y+28*s;h=max(1,h-28*s);headerH=0
+    else
+        local frame=self:_theme("card")
+        if win then win:_fill("overlay",x,y,w,h,"card",14*s)else rect(x,y,w,h,frame,14*s,frame[4]or 255)end
+        if win then win:_out(x,y,w,h,14*s,.8,win.outlineColor or self:_theme("outline"),115)else outline(x,y,w,h,self:_theme("outline"),14*s,115,max(.8,s))end
+        textC(upper(self.title or"ESP PREVIEW"),x+pad,y+20*s,self:_theme("muted"),13*s,"Verdana")
+        line(x+pad,y+40*s,x+w-pad,y+40*s,self:_theme("line"),1,30)
+    end
+
+    local stageX=x+pad
+    local stageY=y+headerH+pad
+    local stageW=max(90,w-pad*2)
+    local stageH=max(120,h-headerH-pad*2)
+    if win then win:_fill("control",stageX,stageY,stageW,stageH,"control",12*s)else rect(stageX,stageY,stageW,stageH,self:_theme("control"),12*s,245)end
+    outline(stageX,stageY,stageW,stageH,self:_theme("outline"),12*s,60,max(.8,s))
+
+    if self.stageGuides then
+        line(stageX+stageW*.5,stageY+12*s,stageX+stageW*.5,stageY+stageH-12*s,self:_theme("line"),1,16)
+        line(stageX+12*s,stageY+stageH*.5,stageX+stageW-12*s,stageY+stageH*.5,self:_theme("line"),1,16)
+    end
+
+    if self.editable and self.widgetTools~=false then
+        local labels={{"RESET",function()self:ResetLayout()end},{"MIX",function()self:ShuffleWidgets()end}}
+        local bw,bh,g=48*s,21*s,5*s
+        local total=#labels*bw+(#labels-1)*g
+        local tx=stageX+stageW-total-8*s
+        local ty=stageY+8*s
+        for _,it in ipairs(labels)do
+            local hov=self:_hitESP(Input.mx,Input.my,tx,ty,bw,bh)
+            if hov then rect(tx,ty,bw,bh,self:_theme("controlHover"),6*s,220)end
+            local tw=measure(it[1],9*s,"Verdana")
+            textC(it[1],tx+(bw-tw)*.5,ty+bh*.5,self:_theme(hov and"text"or"muted"),9*s,"Verdana")
+            if Input.click and hov and not E.pointerConsumed then it[2]();E.pointerConsumed=true;if win then win._consumed=true end end
+            tx=tx+bw+g
+        end
+    end
+
+    local humanW=min(stageW*.39,156*s)
+    local humanH=min(stageH*.58,300*s)
+    local bx=stageX+(stageW-humanW)*.5
+    local by=stageY+(stageH-humanH)*.53
+    local cx=bx+humanW*.5
+
+    if self.showSilhouette~=false then
+        local body=self:_theme("muted")
+        local subtle={body[1],body[2],body[3],88}
+        circle(cx,by+humanH*.10,humanW*.075,subtle,88)
+        rect(cx-humanW*.10,by+humanH*.19,humanW*.20,humanH*.34,subtle,humanW*.07,88)
+        line(cx-humanW*.08,by+humanH*.28,bx+humanW*.22,by+humanH*.48,subtle,5*s,88)
+        line(cx+humanW*.08,by+humanH*.28,bx+humanW*.78,by+humanH*.48,subtle,5*s,88)
+        line(cx-humanW*.06,by+humanH*.52,bx+humanW*.34,by+humanH*.88,subtle,5*s,88)
+        line(cx+humanW*.06,by+humanH*.52,bx+humanW*.66,by+humanH*.88,subtle,5*s,88)
+    end
+
+    local boxCol=self.colors.box or self:_theme("white")
+    if self.features.boxes~=false then
+        -- cleaner corner-box instead of a heavy full rectangle
+        local L=min(18*s,humanW*.18)
+        local t=max(1,(self.boxThickness or 1)*s)
+        line(bx,by,bx+L,by,boxCol,t);line(bx,by,bx,by+L,boxCol,t)
+        line(bx+humanW-L,by,bx+humanW,by,boxCol,t);line(bx+humanW,by,bx+humanW,by+L,boxCol,t)
+        line(bx,by+humanH-L,bx,by+humanH,boxCol,t);line(bx,by+humanH,bx+L,by+humanH,boxCol,t)
+        line(bx+humanW,by+humanH-L,bx+humanW,by+humanH,boxCol,t);line(bx+humanW-L,by+humanH,bx+humanW,by+humanH,boxCol,t)
+    end
+
+    if self.features.skeleton then
+        local sk=self.colors.skeleton or self:_theme("white")
+        local hy=by+humanH*.12
+        circle(cx,hy,humanW*.06,sk,210)
+        line(cx,hy+humanW*.06,cx,by+humanH*.53,sk,1*s,210)
+        line(cx,by+humanH*.30,bx+humanW*.25,by+humanH*.47,sk,1*s,210)
+        line(cx,by+humanH*.30,bx+humanW*.75,by+humanH*.47,sk,1*s,210)
+        line(cx,by+humanH*.53,bx+humanW*.34,by+humanH*.88,sk,1*s,210)
+        line(cx,by+humanH*.53,bx+humanW*.66,by+humanH*.88,sk,1*s,210)
+    end
+
+    local health=self:_currentHealth()
+    local hpCol=self.colors.health or{92,213,117,255}
+    self.positions.healthbar=espSlot92(self.positions.healthbar or 4)
+    local hits={}
+    local function hit(kind,xx,yy,ww,hh)hits[#hits+1]={kind=kind,x=xx,y=yy,w=ww,h=hh}end
+    local dragging=self._espDrag
+
+    local function drawHealth(slot,ghost)
+        local side=(slot==2 or slot==4 or slot==6 or slot==8)and slot or 4
+        if side==4 or side==6 then
+            local hx=side==4 and bx-10*s or bx+humanW+6*s
+            rect(hx,by,4*s,humanH,{10,11,14,255},2*s,210)
+            local fh=humanH*health/100
+            rect(hx,by+humanH-fh,4*s,fh,hpCol,2*s,ghost and 150 or(hpCol[4]or 255))
+            if not ghost then hit("healthbar",hx-8*s,by-5*s,20*s,humanH+10*s)end
+        else
+            local hy=side==2 and by-10*s or by+humanH+6*s
+            rect(bx,hy,humanW,4*s,{10,11,14,255},2*s,210)
+            rect(bx,hy,humanW*health/100,4*s,hpCol,2*s,ghost and 150 or(hpCol[4]or 255))
+            if not ghost then hit("healthbar",bx-5*s,hy-8*s,humanW+10*s,20*s)end
+        end
+    end
+
+    if self.features.healthbar~=false and(self.healthStyle=="bar"or self.healthStyle=="both"or self.healthStyle==nil)and dragging~="healthbar"then
+        drawHealth(self.positions.healthbar,false)
+    end
+
+    local groups={}
+    local function add(kind,textv,col)
+        if kind=="healthtext"then
+            if not(self.features.healthtext or self.healthStyle=="text"or self.healthStyle=="both")then return end
+        elseif not self.features[kind]then return end
+        local slot=espSlot92(self.positions[kind]or(kind=="distance"and 8 or(kind=="healthtext"and 6 or 2)))
+        self.positions[kind]=slot
+        groups[slot]=groups[slot]or{}
+        groups[slot][#groups[slot]+1]={kind=kind,text=textv,col=col}
+    end
+    add("name",self.texts.name or"Player",self.colors.name or self:_theme("text"))
+    add("healthtext",tostring(round(health)).." HP",hpCol)
+    add("distance",self.texts.distance or"42m",self.colors.distance or self:_theme("muted"))
+
+    for slot,list in pairs(groups)do
+        sort(list,function(a,b)return(self.order[a.kind]or 99)<(self.order[b.kind]or 99)end)
+        local ax,ay,row,col=slotInfo92(slot,bx,by,humanW,humanH,12*s)
+        local lineH=18*s
+        local shown={}
+        local maxW=0
+        for _,it in ipairs(list)do if it.kind~=dragging then shown[#shown+1]=it;maxW=max(maxW,measure(it.text,13*s,"Verdana"))end end
+        local total=#shown*lineH
+        local sx=col==1 and(ax-8*s-maxW)or(col==2 and(ax-maxW*.5)or ax+8*s)
+        local sy=row==1 and(ay-8*s-total)or(row==2 and(ay-total*.5)or ay+8*s)
+        for i,it in ipairs(shown)do
+            local tw=measure(it.text,13*s,"Verdana")
+            local tx=col==1 and(sx+maxW-tw)or(col==2 and(sx+(maxW-tw)*.5)or sx)
+            local ty=sy+(i-1)*lineH
+            text(it.text,tx,ty,it.col,13*s,"Verdana")
+            hit(it.kind,tx-5*s,ty-4*s,tw+10*s,20*s)
+        end
+    end
+
+    if self.features.snapline then line(stageX+stageW*.5,stageY+stageH,bx+humanW*.5,by+humanH,self.colors.snapline or self:_theme("accent"),1*s,180)end
+
+    if self.editable and not self._espDrag and Input.click and not E.pointerConsumed then
+        for i=#hits,1,-1 do
+            local q=hits[i]
+            if self:_hitESP(Input.mx,Input.my,q.x,q.y,q.w,q.h)then
+                self._espDrag=q.kind
+                self._espDragStarted=E.paintCount
+                E.pointerConsumed=true
+                if win then win._consumed=true end
+                break
+            end
+        end
+    end
+
+    if self._espDrag then
+        E.pointerConsumed=true;if win then win._consumed=true end
+        local kind=self._espDrag
+        local near=nearestSlot92(Input.mx,Input.my,bx,by,humanW,humanH,kind=="healthbar")
+        local slots=kind=="healthbar"and{2,4,6,8}or{1,2,3,4,6,7,8,9}
+        for _,slot in ipairs(slots)do
+            local ax,ay=slotInfo92(slot,bx,by,humanW,humanH,12*s)
+            local active=slot==near
+            circle(ax,ay,(active and 3.8 or 2.2)*s,active and self:_theme("accent")or self:_theme("muted"),active and 255 or 120)
+        end
+        if kind=="healthbar"then
+            drawHealth(near,true)
+        else
+            local label=kind=="name"and(self.texts.name or"Player")or(kind=="distance"and(self.texts.distance or"42m")or(tostring(round(health)).." HP"))
+            local col=kind=="name"and(self.colors.name or self:_theme("text"))or(kind=="distance"and(self.colors.distance or self:_theme("muted"))or hpCol)
+            local tw=measure(label,13*s,"Verdana")
+            text(label,Input.mx-tw*.5,Input.my-7*s,col,13*s,"Verdana")
+        end
+        local started=self._espDragStarted or E.paintCount
+        if E.paintCount>started and(Input.released or not Input.left)then
+            espReorder92(self,kind,near,Input.my,bx,by,humanW,humanH)
+            self.positions[kind]=near
+            self._espDrag=nil
+            self._espDragStarted=nil
+        end
+    end
+end
+
+-- Peak defaults are intentionally aggressive but do not remove features.
+local ultraSetPerformanceMode=Fawn.SetPerformanceMode
+function Fawn:SetPerformanceMode(mode)
+    ultraSetPerformanceMode(self,mode)
+    local P=self.Performance
+    if P.Mode=="Peak"then
+        P.SnowParticles=28
+        P.ColorPickerCols=14;P.ColorPickerRows=10;P.ColorPickerHueSteps=24;P.ColorPickerAlphaSteps=48
+        P.PeakStaticSurfaces=true
+    elseif P.Mode=="Balanced"then
+        P.SnowParticles=44
+        P.ColorPickerCols=20;P.ColorPickerRows=14;P.ColorPickerHueSteps=32;P.ColorPickerAlphaSteps=64
+        P.PeakStaticSurfaces=false
+    else
+        P.SnowParticles=64
+        P.ColorPickerCols=32;P.ColorPickerRows=22;P.ColorPickerHueSteps=48;P.ColorPickerAlphaSteps=96
+        P.PeakStaticSurfaces=false
+    end
+    return self
+end
+
+local ultraStats=Fawn.GetPerformanceStats
+function Fawn:GetPerformanceStats()
+    local q=ultraStats(self)
+    q.colorPickerCells=(self.Performance.ColorPickerCols or 0)*(self.Performance.ColorPickerRows or 0)
+    q.colorPickerHueSteps=self.Performance.ColorPickerHueSteps
+    q.colorPickerAlphaSteps=self.Performance.ColorPickerAlphaSteps
+    q.peakStaticSurfaces=self.Performance.PeakStaticSurfaces~=false
+    q.reuseControlRects=self.Performance.ReuseControlRects~=false
+    return q
+end
+
+
+-- ============================================================================
+-- 10.0.1 three-dot accessory stack rewrite
+-- Nested accessory children are owned by the three-dot popup itself instead of
+-- borrowing the normal page dropdown/color popup state. This removes ordering
+-- ambiguity and guarantees child-first modal input.
+-- ============================================================================
+
+local function accChildHit(win,ch)
+    return ch and ch.x and ch.y and ch.w and ch.h and win:_hit(ch.x,ch.y,ch.w,ch.h)
+end
+
+local function accOpenChild(win,p,kind,c,x,y,w,h,tx,ty,tw,th)
+    if not p or win.extraPopup~=p then return nil end
+    local old=p.child
+    if old and old.kind==kind and old.control==c then p.child=nil;return nil end
+    local ch={kind=kind,control=c,x=x,y=y,w=w,h=h,triggerX=tx,triggerY=ty,triggerW=tw,triggerH=th,scroll=0}
+    p.child=ch
+    return ch
+end
+
+local function accDrawDropdown(win,parent,ch)
+    local c=ch.control
+    if not alive(c)then parent.child=nil;return end
+    if c.optionsSource then c:RefreshOptionsSource(false)end
+    local s=win.scale
+    local F=REF.Full
+    local rows=min(c:GetMaxVisibleOptions(),max(1,#c.options))
+    ch.h=12*s+rows*F.itemH*s
+    ch.w=max(96*s,ch.w or 148*s)
+    ch.anchorY=ch.triggerY
+    win:_clampPopup(ch)
+    win:_popupFrame(ch)
+
+    local maxScroll=max(0,#c.options-rows)
+    ch.scroll=clamp(ch.scroll or 0,0,maxScroll)
+    if win:_hit(ch.x,ch.y,ch.w,ch.h)and Input.wheel~=0 then ch.scroll=clamp(ch.scroll+Input.wheel*c:GetDropdownScrollStep(),0,maxScroll)end
+
+    for row=1,rows do
+        local i=row+ch.scroll
+        if i>#c.options then break end
+        local yy=ch.y+6*s+(row-1)*F.itemH*s
+        local hov=win:_hit(ch.x+5*s,yy,ch.w-10*s,F.itemH*s)
+        local selected=c.type=="dropdown"and c.value==i or(c.type=="multiselect"and c.value[i]==true)
+        if hov then win:_fill("control",ch.x+5*s,yy,ch.w-10*s,F.itemH*s,"controlHover",F.itemR*s)
+        elseif selected then rect(ch.x+5*s,yy,ch.w-10*s,F.itemH*s,win:_color("accent"),F.itemR*s,24)end
+        textC(fit(c.options[i],ch.w-42*s,F.itemFont*s,"Verdana"),ch.x+F.itemPad*s,yy+F.itemH*s*.5,win:_color(selected and"white"or"text"),F.itemFont*s,"Verdana")
+        if selected then ICON.check(ch.x+ch.w-20*s,yy+F.itemH*s*.5,12*s,win:_color("accent"))end
+        if Input.click and not win._consumed and hov then
+            if c.type=="dropdown"then c:Set(i);parent.child=nil else c:ToggleOption(i)end
+            win:_consume()
+            return
+        end
+    end
+end
+
+local function accDrawColor(win,parent,ch)
+    local c=ch.control
+    if not alive(c)then parent.child=nil;return end
+    local s=win.scale
+    ch.w=232*s;ch.h=238*s;ch.anchorY=ch.triggerY
+    win:_clampPopup(ch);win:_popupFrame(ch)
+
+    local arr=c.value
+    local hue,sat,val=rgbToHsv92(arr[1],arr[2],arr[3])
+    local svx,svy,svw,svh=ch.x+12*s,ch.y+39*s,158*s,108*s
+    local hx,hy,hw,hh=ch.x+181*s,ch.y+39*s,16*s,108*s
+    local ax,ay,aw,ah=ch.x+12*s,ch.y+169*s,185*s,12*s
+    textC(upper(c.label or"COLOR"),ch.x+12*s,ch.y+17*s,win:_color("text"),13*s,"Verdana")
+
+    local cols=max(8,floor(Fawn.Performance.ColorPickerCols or 14))
+    local rows=max(6,floor(Fawn.Performance.ColorPickerRows or 10))
+    local cw,chh=svw/cols,svh/rows
+    for iy=0,rows-1 do
+        local vv=1-iy/max(1,rows-1)
+        for ix=0,cols-1 do
+            local ss=ix/max(1,cols-1)
+            local r,g,b=hsvToRgb92(hue,ss,vv)
+            rect(svx+ix*cw,svy+iy*chh,cw+1,chh+1,{r,g,b,255},0,255)
+        end
+    end
+    win:_out(svx-1*s,svy-1*s,svw+2*s,svh+2*s,4*s,.8,win:_color("outline"),210)
+    local sx,sy=svx+sat*svw,svy+(1-val)*svh
+    circle(sx,sy,3.2*s,win:_color("white"),255);outline(sx-4.2*s,sy-4.2*s,8.4*s,8.4*s,win:_color("black"),4.2*s,190,max(.8,s))
+
+    local hs=max(12,floor(Fawn.Performance.ColorPickerHueSteps or 24))
+    for i=0,hs-1 do
+        local r,g,b=hsvToRgb92(i/max(1,hs-1),1,1)
+        rect(hx,hy+i*(hh/hs),hw,hh/hs+1,{r,g,b,255},0,255)
+    end
+    win:_out(hx-1*s,hy-1*s,hw+2*s,hh+2*s,3*s,.8,win:_color("outline"),210)
+    rect(hx-2*s,hy+hue*hh-1*s,hw+4*s,2*s,win:_color("white"),1*s,255)
+
+    win:_fill("control",ax,ay,aw,ah,"control",4*s)
+    local alphaSteps=max(16,floor(Fawn.Performance.ColorPickerAlphaSteps or 48))
+    local seg=aw/alphaSteps
+    for i=0,alphaSteps-1 do
+        local aa=round(i/max(1,alphaSteps-1)*255)
+        rect(ax+i*seg,ay,seg+1,ah,{arr[1],arr[2],arr[3],255},0,aa)
+    end
+    win:_out(ax,ay,aw,ah,4*s,.8,win:_color("outline"),210)
+    rect(ax+(arr[4]or 255)/255*aw-1*s,ay-1*s,2*s,ah+2*s,win:_color("white"),1*s,255)
+
+    local function apply(kind)
+        local h0,s0,v0=rgbToHsv92(arr[1],arr[2],arr[3])
+        local q=copy(arr)
+        if kind=="sv"then s0=clamp((Input.mx-svx)/svw,0,1);v0=1-clamp((Input.my-svy)/svh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
+        elseif kind=="h"then h0=clamp((Input.my-hy)/hh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)
+        else q[4]=round(clamp((Input.mx-ax)/aw,0,1)*255)end
+        c:Set(q)
+    end
+
+    if Input.click and not win._consumed then
+        if win:_hit(svx,svy,svw,svh)then ch.drag="sv";apply("sv");win:_consume()
+        elseif win:_hit(hx,hy,hw,hh)then ch.drag="h";apply("h");win:_consume()
+        elseif win:_hit(ax,ay,aw,ah)then ch.drag="a";apply("a");win:_consume()end
+    end
+    if ch.drag then if Input.left then apply(ch.drag)else ch.drag=nil end end
+end
+
+local function accDrawRow(win,parent,c,x,y,w,h,C,locked)
+    local s=win.scale
+    local left=x+C.padL*s
+    local right=x+w-C.padR*s
+    local cy=y+h*.5
+    local labelW=max(30*s,w*.40)
+    if c.type~="button"and c.type~="label"and c.type~="separator"then
+        textC(fit(c.label or"",labelW,C.font*s,"Verdana"),left,cy,win:_color("text"),C.font*s,"Verdana")
+    end
+
+    if c.type=="dropdown"or c.type=="multiselect"then
+        local fw=min(148*s,max(86*s,w*.48));local fh=C.ddH*s
+        local fx,fy=right-fw,cy-fh*.5
+        local hov=win:_hit(fx,fy,fw,fh)
+        local ch=parent.child;local opened=ch and ch.control==c and ch.kind=="dropdown"
+        win:_fill("control",fx,fy,fw,fh,(hov or opened)and"controlHover"or"control",C.ddR*s)
+        local tv=c.type=="multiselect"and c:GetSummary()or tostring(c:Get()or"None")
+        textC(fit(tv,fw-34*s,C.ddFont*s,"Verdana"),fx+C.ddPadL*s,cy,win:_color("text"),C.ddFont*s,"Verdana")
+        chevDown(fx+fw-C.ddPadR*s-C.chev*s*.5,cy,C.chev*s,win:_color("chev"),opened)
+        if (not locked or opened)and Input.click and not win._consumed and hov then
+            accOpenChild(win,parent,"dropdown",c,fx,fy+fh+6*s,fw,0,fx,fy,fw,fh)
+            win:_consume()
+        end
+        return
+    end
+
+    if c.type=="color"then
+        local nominal=(C==REF.Compact)and REF.ColorChipCompact or REF.ColorChipFull
+        local sz=min(C.sw,nominal)*s;local fx=right-sz;local fy=cy-sz*.5
+        local ch=parent.child;local opened=ch and ch.control==c and ch.kind=="color"
+        win:_fill("control",fx,fy,sz,sz,opened and"controlHover"or"control",min(8*s,sz*.24))
+        rect(fx+1*s,fy+1*s,sz-2*s,sz-2*s,c.value,max(1,min(8*s,sz*.24)-1*s),c.value[4]or 255)
+        win:_out(fx,fy,sz,sz,min(8*s,sz*.24),.9,win:_color("outline"),220)
+        if (not locked or opened)and Input.click and not win._consumed and win:_hit(fx,fy,sz,sz)then
+            accOpenChild(win,parent,"color",c,fx+sz-232*s,fy+sz+6*s,232*s,238*s,fx,fy,sz,sz)
+            win:_consume()
+        end
+        return
+    end
+
+    if c.type=="slider"then
+        local editing=win.sliderEdit and win.sliderEdit.control==c
+        local display=win:_sliderDisplay(c,c.value or c.min)
+        local shown=editing and tostring(win.sliderEdit.text or"")or display
+        local txtW=measure(shown,C.valFont*s,"Verdana")
+        local vw=max((editing and 78 or 58)*s,txtW+C.valPad*2*s)
+        local vx=right-vw;local vh=C.valH*s;local vy=cy-vh*.5
+        local sx=left+labelW;local sw=max(34*s,vx-C.sGap*s-sx)
+        rect(sx,cy-2*s,sw,4*s,win:_color("control"),2*s,255)
+        local q=clamp((clamp(c.value or c.min,c.min,c.max)-c.min)/max(.00001,c.max-c.min),0,1)
+        rect(sx,cy-2*s,sw*q,4*s,win:_color("accent"),2*s,255);circle(sx+sw*q,cy,max(4*s,C.sKnob*s*.32),win:_color("white"),255)
+        local vhv=win:_hit(vx,vy,vw,vh)
+        win:_fill("control",vx,vy,vw,vh,(editing or vhv)and"controlHover"or"control",C.valR*s)
+        if editing then win:_out(vx,vy,vw,vh,C.valR*s,1,win:_color("accent"),255);ultraSliderCaret(win,win.sliderEdit,shown,vx,vw,cy,C)
+        else textC(display,vx+(vw-txtW)*.5,cy,win:_color("text"),C.valFont*s,"Verdana")end
+
+        if c._accessoryDrag then
+            if Input.left then c:Set(c.min+clamp((Input.mx-sx)/max(1,sw),0,1)*(c.max-c.min))else c._accessoryDrag=nil end
+        end
+        if not locked and not win._consumed then
+            if (Input.click or Input.rightClick)and vhv then win:_startSliderEdit(c,{vx,vy,vw,vh});win:_consume()
+            elseif Input.click and win:_hit(sx,cy-15*s,sw,30*s)and not editing then c._accessoryDrag=true;c:Set(c.min+clamp((Input.mx-sx)/max(1,sw),0,1)*(c.max-c.min));win:_consume()end
+        end
+        return
+    end
+
+    -- Reuse the stable renderer for remaining non-popup accessory controls.
+    ultraAccessoryRow(win,c,x,y,w,h,C,not locked)
+end
+
+function Window:_drawExtraPopup()
+    local p=self.extraPopup
+    if not p then return end
+    local owner=p.control
+    if not alive(owner)then self.extraPopup=nil;return end
+    local s=self.scale;local C=REF.Compact;local rowH=C.rowH*s;local header=36*s
+    local controls=owner.extraSection and owner.extraSection.controls or{}
+    local visible={}
+    for _,c in ipairs(controls)do if alive(c)and visibilityPass(c)then visible[#visible+1]=c end end
+    local keyRows=(owner.keybind and not owner.keybind.accessoryOnly)and 1 or 0
+    p.w=REF.AccessoryWidth*s;p.h=header+max(1,keyRows+#visible)*rowH+8*s
+    self:_clampPopup(p);self:_popupFrame(p)
+    textC("ACCESSORIES",p.x+14*s,p.y+18*s,self:_color("muted"),12*s,"Verdana")
+
+    local y=p.y+header
+    local locked=p.child~=nil
+
+    if keyRows==1 then
+        local k=owner.keybind;local shown=self:_keyLabel(k)
+        local tw=measure(shown,C.keyFont*s,"Verdana");local fw=min(126*s,max(76*s,tw+C.keyPad*2*s));local fh=C.keyH*s
+        local fx=p.x+p.w-C.padR*s-fw;local fy=y+(rowH-fh)*.5;local cy=y+rowH*.5
+        textC("Keybind",p.x+C.padL*s,cy,self:_color("text"),C.font*s,"Verdana")
+        self:_fill("control",fx,fy,fw,fh,"control",C.keyR*s)
+        textC(shown,fx+(fw-tw)*.5,cy,self:_color("text"),C.keyFont*s,"Verdana")
+        y=y+rowH
+    end
+
+    for _,c in ipairs(visible)do
+        local own=p.child and p.child.control==c
+        accDrawRow(self,p,c,p.x,y,p.w,rowH,C,locked and not own)
+        y=y+rowH
+    end
+
+    local ch=p.child
+    if ch then
+        if ch.kind=="dropdown"then accDrawDropdown(self,p,ch)
+        elseif ch.kind=="color"then accDrawColor(self,p,ch)end
+    end
+
+    if p.child and(Input.click or Input.rightClick)and not self._consumed then
+        local ch=p.child
+        local inChild=accChildHit(self,ch)
+        local inTrigger=ch.triggerX and self:_hit(ch.triggerX,ch.triggerY,ch.triggerW,ch.triggerH)
+        if self:_hit(p.x,p.y,p.w,p.h)and not inChild and not inTrigger then p.child=nil;self:_consume()end
+    elseif not p.child and(Input.click or Input.rightClick)and not self._consumed and self:_hit(p.x,p.y,p.w,p.h)then
+        self:_consume()
+    end
+end
+
+Fawn.Version="10.0.3-serotonin"
+Fawn.APIRevision=43
+Fawn.BuildId="fawn-modern-10.0.3-accessory-child-hitfix-20260917"
+Fawn.PolishVersion="10.0.3"
+Fawn.DynamicCapabilities.AccessoryPopupStackV3=true
+Fawn.Runtime.AccessoryPopupFinal="dedicated child stack owned by three-dot popup; child-first modal input; no shared page popup state; typed accessory sliders"
+Fawn:SetPerformanceMode("Peak")
+
+Fawn.DynamicCapabilities.PopupPointerIsolation=true
+Fawn.DynamicCapabilities.AccessoryNumericEditor=true
+Fawn.DynamicCapabilities.AccessoryColorPickerV2=true
+Fawn.DynamicCapabilities.CleanOptionalESP=true
+Fawn.DynamicCapabilities.NeutralManagedImages=true
+Fawn.DynamicCapabilities.UltraPeakRenderer=true
+Fawn.DynamicCapabilities.ReusedControlRects=true
+Fawn.Runtime.AccessoryPopupFinal="exclusive popup-layer pointer routing; nested dropdown/color/key children; left/right-click numeric slider editor"
+Fawn.Runtime.ESPPreview="clean corner-box preview; optional visibility; draggable slot widgets with stable release commit"
+Fawn.Runtime.ManagedImages="explicit white/full-alpha draw.Image only; custom logo/profile images are not theme-tinted"
+Fawn.Runtime.Performance="Peak: cached direct drawing + static solid surfaces + authored-order Section traversal + reusable control rectangles + reduced color-picker/snow budgets"
+
 end
 
 return Fawn
