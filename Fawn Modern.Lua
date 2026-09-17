@@ -1,3 +1,4 @@
+-- Fawn Modern | Canonical Serotonin build
 local Fawn={
     ProductName="Fawn Modern",
     DisplayName="Fawn Modern",
