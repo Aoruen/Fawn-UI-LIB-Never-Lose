@@ -1,17 +1,15 @@
+-- Fawn Modern | Canonical Serotonin build
 local Fawn={
-    Version="9.8.1-serotonin",
-    APIRevision=37,
-    BuildId="fawnui-serotonin-9.8.1-pixel-polish-glass-wrap-20260916",
-    ProductName="Fawn Neverlose UI",
-    Nickname="Fawn Modern",
+    ProductName="Fawn Modern",
+    DisplayName="Fawn Modern",
     IsFawnLibrary=true,
     IsModular=true,
-    Namespace="FawnNeverloseUI"
+    Namespace="FawnModern",
 }
 
-if type(draw)~="table" or type(Color3)~="table" then error("Fawn Neverlose UI: Serotonin draw and Color3 APIs are required") end
-if type(utility)~="table" or type(mouse)~="table" or type(keyboard)~="table" then error("Fawn Neverlose UI: Serotonin utility, mouse and keyboard APIs are required") end
-if type(cheat)~="table" or type(cheat.Register)~="function" then error("Fawn Neverlose UI: cheat.Register is required") end
+if type(draw)~="table" or type(Color3)~="table" then error("Fawn Modern: Serotonin draw and Color3 APIs are required") end
+if type(utility)~="table" or type(mouse)~="table" or type(keyboard)~="table" then error("Fawn Modern: Serotonin utility, mouse and keyboard APIs are required") end
+if type(cheat)~="table" or type(cheat.Register)~="function" then error("Fawn Modern: cheat.Register is required") end
 
 local floor,ceil,abs,min,max,sin,cos,pi=math.floor,math.ceil,math.abs,math.min,math.max,math.sin,math.cos,math.pi
 local insert,remove,concat,sort=table.insert,table.remove,table.concat,table.sort
@@ -995,7 +993,7 @@ if themeName=="Neverlose"or themeName=="Fawn"then themeName="Modern Blue"end
         scale=clamp(tonumber(opt.scale)or 1,.55,1.65),visible=opt.visible~=false,destroyed=false,columns=clamp(floor(tonumber(opt.columns)or 2),1,4),tabs={},flags={},activeTab=nil,
         themeName=themeName,theme=copy(PRESETS[themeName]or PRESETS["Modern Blue"]),independentTheme=opt.independentTheme==true,font="Verdana",corner=tonumber(opt.corner)or 22,borderThickness=max(1,tonumber(opt.borderThick or opt.borderThickness)or 1),
         toggleKey=opt.toggleKey or"Insert",toggleLabel=opt.toggleLabel or"INSERT",toggleControl=nil,followMenu=opt.followMenu==true,mainScrollEnabled=opt.mainScrollEnabled~=false,smoothScroll=opt.smoothScroll~=false,scrollSpeed=tonumber(opt.scrollSpeed)or 12,
-        liquidGlass=opt.liquidGlass==true,glassOpacity=clamp(tonumber(opt.glassOpacity)or .72,.18,1),animations=opt.animations~=false,animationSpeed=tonumber(opt.animationSpeed)or 10,accentGlow=opt.accentGlow==true,compact=opt.compact==true,layoutMode=opt.layoutMode or"Neverlose",
+        liquidGlass=opt.liquidGlass==true,glassOpacity=clamp(tonumber(opt.glassOpacity)or .72,.18,1),animations=opt.animations~=false,animationSpeed=tonumber(opt.animationSpeed)or 10,accentGlow=opt.accentGlow==true,compact=opt.compact==true,layoutMode=opt.layoutMode or"Modern",
         tabBarVisible=opt.tabBar~=false,backgroundBlur=opt.backgroundBlur==true,backgroundSnow=opt.backgroundSnow==true,
         draggable=opt.draggable~=false,resizable=opt.resizable~=false,dragging=nil,resizing=nil,sidebarScroll=0,sidebarTarget=0,inputEdit=nil,captureBind=nil,activeSlider=nil,openDrop=nil,keyMenu=nil,colorPopup=nil,configPopup=nil,groupPopup=nil,accountOpen=false,accountAnim=0,searchOpen=false,search="",searchEdit=nil,
         profileName=tostring(opt.user or opt.profileName or"User"),profileSubtitle=tostring(opt.userSub or opt.profileSubtitle or""),profileImage=nil,profileImagePath=nil,profileClick=nil,
@@ -1078,7 +1076,7 @@ function Window:SetAccentGlow(v)self.accentGlow=v==true
 return self end
 function Window:SetCompact(v)self.compact=v==true
 return self end
-function Window:SetLayoutMode(v)self.layoutMode=tostring(v or"Neverlose")
+function Window:SetLayoutMode(v)self.layoutMode=tostring(v or"Modern")
 return self end
 function Window:SetBackgroundBlur(v)self.backgroundBlur=v==true
 return self end
@@ -2366,7 +2364,7 @@ self:_clampPopup(p)
 self:_popupFrame(p)
     local titleY=p.y+24*s
 textC("ACCOUNT",p.x+14*s,titleY,self:_color("muted"),13*s,"Verdana")
-    local items={{"Settings","settings","settings"},{"Profile","user","profile"},{"Copy Build ID","note","build"},{"Reset UI Position","misc","center"},{"Close","misc","close"}}
+    local items={{"Settings","settings","settings"},{"Profile","user","profile"},{"Reset UI Position","misc","center"},{"Close","misc","close"}}
     for i,it in ipairs(items)do local y=p.y+42*s+(i-1)*36*s
 local hov=self:_hit(p.x+6*s,y,p.w-12*s,34*s)
 if hov then self:_fill("control",p.x+6*s,y,p.w-12*s,34*s,"controlHover",7*s)end
@@ -2376,8 +2374,7 @@ if Input.click and not self._consumed and hov then if it[3]=="settings"then loca
 if not t then local sp=Fawn:CreateSettingsPage(self,{}) t=sp.Tab end
 if t then self:SelectTab(t)end
 self.accountOpen=false elseif it[3]=="center"then self:Center()
-self.accountOpen=false elseif it[3]=="close"then self.accountOpen=false elseif it[3]=="build"then self:Notify(Fawn.BuildId,{title="BUILD"})
-self.accountOpen=false else if type(self.profileMenuItems.profile)=="function"then pcall(self.profileMenuItems.profile,self)end
+self.accountOpen=false elseif it[3]=="close"then self.accountOpen=false else if type(self.profileMenuItems.profile)=="function"then pcall(self.profileMenuItems.profile,self)end
 self.accountOpen=false end
 self:_consume()end end
 end
@@ -3085,7 +3082,7 @@ Fawn.StatusBar=Fawn.CreateStatusBar
 -- Settings page
 local SettingsPage={}
 SettingsPage.__index=SettingsPage
-local function settingsPath(path)return "C:/Serotonin/files/"..tostring(path or"FawnNeverlose/config.lua")end
+local function settingsPath(path)return "C:/Serotonin/files/"..tostring(path or"Fawn Modern/configs/default.lua")end
 local function serialize(v,seen)
     local t=type(v)
 if t=="nil"then return"nil"elseif t=="boolean"or t=="number"then return tostring(v)elseif t=="string"then return format("%q",v)elseif t~="table"then return"nil"end
@@ -3098,7 +3095,7 @@ out[#out+1]="}"
 seen[v]=nil
 return concat(out)
 end
-function SettingsPage:SetConfigPath(p)self.ConfigPath=tostring(p or"FawnNeverlose/config.lua")
+function SettingsPage:SetConfigPath(p)self.ConfigPath=tostring(p or"Fawn Modern/configs/default.lua")
 return self end
 function SettingsPage:GetConfigPath()return self.ConfigPath end
 function SettingsPage:CaptureDefaults()self.Defaults=self.Window:GetConfig()
@@ -3141,7 +3138,7 @@ function Fawn:CreateSettingsPage(window,opt)
     if kind(window)~="Window"and kind(window)~="Panel"then error("CreateSettingsPage requires a Fawn Window")end
     if window.settingsPage then return window.settingsPage end
     opt=type(opt)=="table"and opt or{}
-    local page=setmetatable({Window=window,Controls={},ConfigPath=tostring(opt.configPath or"FawnNeverlose/config.lua"),Defaults=nil},SettingsPage)
+    local page=setmetatable({Window=window,Controls={},ConfigPath=tostring(opt.configPath or"Fawn Modern/configs/default.lua"),Defaults=nil},SettingsPage)
     local tab=window:Tab(opt.title or"Settings",{group=opt.group or"MISCELLANEOUS",icon="misc"})
 page.Tab=tab
     local appearance=tab:Section("APPEARANCE",{column=1,row=1,sizeMode="auto"})
@@ -3200,7 +3197,6 @@ page.Controls.Path:OnChanged(function(v)page:SetConfigPath(v)end)
 window:Notify("Named config saved",{title="CONFIG"})end,"Duplicate",function()local n=window:DuplicateNamedConfig()
 window:Notify("Created "..n,{title="CONFIG"})end)
 
-    diagnostics:AddValue("Build",function()return Fawn.BuildId end,{controlColumn=1,wrap=true,maxLines=2,muted=true})
     diagnostics:AddValue("Paint Frames",function()return Fawn:GetPaintCount()end,{controlColumn=1})
     diagnostics:AddValue("Paint Errors",function()local n=Fawn:GetPaintErrors()
 return n end,{controlColumn=1})
@@ -3208,7 +3204,7 @@ return n end,{controlColumn=1})
     diagnostics:AddValue("Window Size",function()local w,h=window:GetSize()
 return round(w).." x "..round(h)end,{controlColumn=2})
     diagnostics:AddValue("Scale",function()return round(window:GetScale()*100).."%"end,{controlColumn=2})
-    diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Neverlose UI is rendering correctly.",{title="DIAGNOSTICS"})end,{controlColumn=2})
+    diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Modern is rendering correctly.",{title="DIAGNOSTICS"})end,{controlColumn=2})
     page:CaptureDefaults()
 window.settingsPage=page
 return page
@@ -3249,12 +3245,11 @@ function Fawn:WrapText(value,maxWidth,font,maxLines,size)return wrapText(value,m
 function Fawn:GetKind(object)return kind(object)end
 function Fawn:Is(object,k)return kind(object)==k end
 function Fawn:GetDynamicCapabilities()return{dynamicControls=true,dynamicSections=true,dynamicTabs=true,optionMutation=true,optionSources=true,visibilityRules=true,textInput=true,textWrapping=true,nestedScrolling=true,uiScale=true,liquidGlass=true,embeddedESP=true,draggableOverlays=true,namedConfigs=true}end
-function Fawn:AssertCompatible(revision)if tonumber(revision)and tonumber(revision)>self.APIRevision then error("Fawn Neverlose UI API "..tostring(revision).." required; loaded API "..tostring(self.APIRevision))end
-return true end
+function Fawn:AssertCompatible()return true end
 
 
 -- ==========================================================================
--- Fawn Neverlose UI 9.1 extended library surface
+-- Fawn Modern compatibility surface (legacy API layer)
 -- Dynamic construction, schema APIs, navigation mutation, metrics, rules,
 -- object events, layout validation, state snapshots, and compatibility aliases.
 -- ==========================================================================
@@ -4661,7 +4656,7 @@ Fawn.globalThemeName="Modern Blue"
 Fawn.globalTheme=copy(PRESETS["Modern Blue"])
 
 
--- 9.2 layout/input/ESP stability pass -------------------------------------------------
+-- Compatibility layer: layout/input/ESP stability -------------------------------------
 Fawn.Runtime=Fawn.Runtime or {}
 Fawn.Style.ContainerClip=true
 Fawn.Style.ReferenceAccessoryPopups=true
@@ -5055,7 +5050,7 @@ Fawn.Runtime.ColorPicker="original Fawn HSV/SV + hue + alpha picker with color c
 Fawn.Runtime.Input="original Fawn caret-aware single-line text input with horizontal text window"
 
 
--- 9.3 final containment / scale / ESP parity layer.
+-- Compatibility layer: containment / scale / ESP parity.
 local function applyScale93(self,newScale)
     local old=self.scale or 1
     newScale=clamp(tonumber(newScale)or old,.55,1.65)
@@ -5238,7 +5233,7 @@ Fawn.Runtime.Scrollbar="accent hover/drag feedback for Section, page and sidebar
 Fawn.Runtime.ESPWidgets="original Fawn cursor-follow drag parity + slot commit + stacking reorder + reset/shuffle"
 
 
--- 9.4 scroll/accessory/layout polish layer.
+-- Compatibility layer: scroll/accessory/layout polish.
 REF.PageScrollbarGutter=12
 REF.SectionScrollbarGutter=12
 REF.AccessoryWidth=318
@@ -5480,7 +5475,7 @@ Fawn.Runtime.ColorPicker="compact Fawn HSV/SV + hue + alpha picker"
 
 
 
--- 9.5 scroll-capture / wrapping / color / caret polish layer.
+-- Compatibility layer: scroll-capture / wrapping / color / caret polish.
 REF.SectionGap=35
 REF.ColorChipFull=34
 REF.ColorChipCompact=30
@@ -5590,7 +5585,7 @@ function Window:_drawColorPopup()
     if p.drag then if Input.left then local h0,s0,v0=rgbToHsv92(arr[1],arr[2],arr[3]);local q=copy(arr);if p.drag=="sv"then s0=clamp((Input.mx-svx)/svw,0,1);v0=1-clamp((Input.my-svy)/svh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)elseif p.drag=="h"then h0=clamp((Input.my-hy)/hh,0,1);q[1],q[2],q[3]=hsvToRgb92(h0,s0,v0)else q[4]=round(clamp((Input.mx-ax)/aw,0,1)*255)end;c:Set(q)else p.drag=nil end end
 end
 
--- Stable page/section scrollbars. Explicit numeric geometry avoids the Lua `true` arithmetic crash from 9.4.
+-- Stable page/section scrollbars with explicit numeric geometry.
 local function scrollbarThumb95(win,x,top,height,thumb,ratio,active)
     local s=win.scale;local span=max(1,height-thumb);local y=top+span*clamp(ratio,0,1);local hover=win:_hit(x-7*s,y-4*s,14*s,thumb+8*s);local over=hover or active
     local half=over and 2*s or 1.5*s;local width=over and 4*s or 3*s
@@ -5619,7 +5614,7 @@ Fawn.Runtime.ColorPicker95="smaller chips + compact HSV popup + inset outlines"
 Fawn.Runtime.CaretScale="cursor-centric input viewport + editor geometry reset on scale reflow"
 
 
--- 9.6 input ownership / endpoint scroll stability / outline finalization layer.
+-- Compatibility layer: input ownership / endpoint scrolling / outline finalization.
 Fawn.Rules.PopupInputIsModal=true
 Fawn.Rules.FrontOverlayOwnsInputBeforeWindow=true
 Fawn.Rules.ScrollEndpointsSnap=true
@@ -5803,7 +5798,7 @@ Fawn.Runtime.ClickThrough96="dropdown/accessory/color/config/group/account popup
 Fawn.Runtime.Outline96="Section and overlay outlines are inset and drawn after internal fills/scrollbars"
 Fawn.Runtime.RowHotspot96="plain text/value/label rows have no full-row hover or click hotspot"
 
--- 9.7 original-Fawn hotkey / modal pointer / scroll lock layer.
+-- Compatibility layer: hotkeys / modal pointer routing / scroll locking.
 Fawn.Rules.OriginalFawnKeybindCapture=true
 Fawn.Rules.PopupOwnsAllPointerState=true
 Fawn.Rules.ExactWidgetHitboxes=true
@@ -5963,7 +5958,14 @@ end
 
 -- Never paint a row-sized hover surface. Only the authored widget rectangles react visually/click.
 local drawControlBase97=Window._drawControl
-function Window:_drawControl(c,r,clipTop,clipBottom)c.rowHover=false;return drawControlBase97(self,c,r,clipTop,clipBottom)end
+function Window:_drawControl(c,r,clipTop,clipBottom)
+    c.rowHover=false
+    local prev=self._activeControlAnimId
+    self._activeControlAnimId=c and c.id or prev
+    local a,b,d,e=drawControlBase97(self,c,r,clipTop,clipBottom)
+    self._activeControlAnimId=prev
+    return a,b,d,e
+end
 
 -- Stable page layout: content height is computed in unscrolled coordinates, so maxScroll never changes just because the page moved.
 function Window:_buildLayout(tab)
@@ -6129,11 +6131,11 @@ if not paintOK then paintOK=registerEvent("paint",paintEvent)end
 if not updateOK then -- fallback keeps normal controls usable on runtimes without onUpdate
     registerEvent("onPaint",function()updateEvent()end)
 end
-Fawn.Runtime={InputEvent=updateOK and"onUpdate"or"onPaint fallback",PaintEvent=paintOK and"onPaint"or"paint",Font="Verdana",Reference="3(1).lua Neverlose geometry + original Fawn behavioral contract",Renderer="9.7 original-Fawn hotkeys + full modal pointer routing + pre-layout scroll lock",NoFakeShadows=true,SolidOutline=true,CorrectDrawImageSignature="textureId,x,y,w,h,r,g,b,a",ContainerScrolling="reserved section/page gutters + nested ownership + hover/drag accent feedback",Resize="deferred mouse-anchored UI scale + frozen screen-space physical resize",ESPWidgets="original Fawn cursor-follow drag parity + 8-slot commit + stacking reorder, reset and shuffle tools",ColorPicker="original Fawn HSV/SV + hue + alpha picker with color clipboard",Input="original Fawn caret-aware single-line text input with horizontal text window",DropdownScroll="fractional visual interpolation + numeric drag geometry + dedicated gutter",AccessoryPopup="extensible embedded-keybind three-dot popup",KeybindMode="original Fawn: left-click armed capture; Backspace clears; right-click Hold/Toggle/Always On; settings toggle key works while preserving edit isolation",Outline="single solid outer outline + inset rounded strokes",ContainerSeparation="stable gutters + no implicit column splits + responsive wrap geometry"}
+Fawn.Runtime={InputEvent=updateOK and"onUpdate"or"onPaint fallback",PaintEvent=paintOK and"onPaint"or"paint",Font="Verdana",Reference="Fawn Modern reference geometry + Fawn behavioral contract",Renderer="unified shell + modal pointer routing + managed storage + preset settings",NoFakeShadows=true,SolidOutline=true,CorrectDrawImageSignature="textureId,x,y,w,h,r,g,b,a",ContainerScrolling="reserved section/page gutters + nested ownership + hover/drag accent feedback",Resize="deferred mouse-anchored UI scale + frozen screen-space physical resize",ESPWidgets="original Fawn cursor-follow drag parity + 8-slot commit + stacking reorder, reset and shuffle tools",ColorPicker="original Fawn HSV/SV + hue + alpha picker with color clipboard",Input="original Fawn caret-aware single-line text input with horizontal text window",DropdownScroll="fractional visual interpolation + numeric drag geometry + dedicated gutter",AccessoryPopup="extensible embedded-keybind three-dot popup",KeybindMode="original Fawn: left-click armed capture; Backspace clears; right-click Hold/Toggle/Always On; settings toggle key works while preserving edit isolation",Outline="single solid outer outline + inset rounded strokes",ContainerSeparation="stable gutters + no implicit column splits + responsive wrap geometry"}
 
 
 -- 9.8 integrated finishing layer ---------------------------------------------------
-(function(Fawn)
+do local function __fawn_apply_981(Fawn)
     if Fawn.__Polish98 then return end
 
 local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
@@ -6320,7 +6322,7 @@ end
 function Window:_drawToggle(x,cy,on,disabled)
     polishDefaults(self,{})
     local s=self.scale;local F=REF.Full;local w=(F.togW or 55)*s;local h=(F.togH or 28)*s;local knob=(F.knob or 24)*s;local xx=x-w
-    local key=floor(xx+.5)..":"..floor(cy+.5)..":"..floor(w+.5);local target=on and 1 or 0;local p=target
+    local key=self._activeControlAnimId or(floor(xx+.5)..":"..floor(cy+.5)..":"..floor(w+.5));local target=on and 1 or 0;local p=target
     if self.animations and self.switchAnimations and self.motionStyle~="Off"then p=animScalar(self,self._polishSwitchAnim,key,target,motionSpeed(self)*1.15)else self._polishSwitchAnim[key]=target end
     local off=rgba(self:_color("toggleTrack"));local oncol=rgba(self:_color("accent"));local col=blend(off,oncol,p)
     if disabled then col=blend(col,rgba(self:_color("menuBg")),.45)end
@@ -6482,7 +6484,7 @@ function Fawn:CreateSettingsPage(window,opt)
 end
 
 -- Final shell pass: one rounded root, no stacked bottom/top masks.
--- 9.7 already clips content in its layout/Section pass, so repainting thin full-width
+-- Content is already clipped in the layout/Section pass, so repainting thin full-width
 -- chrome masks only damages the outer radii and creates the disconnected-corner look.
 function Window:_render()
     if self.destroyed then return end
@@ -6519,11 +6521,11 @@ Fawn.Style.SingleShell=true
 Fawn.Style.ConnectedProfileDivider=true
 Fawn.Style.SurfaceMaterials=copy(SURFACE_NAMES)
 Fawn.Style.MotionStyles=copy(MOTION_NAMES)
-Fawn.PolishVersion="9.8.1-pixel-polish"
-Fawn.PolishBuildId="fawnui-polish-9.8.1-single-shell-footer-wrap-outline-20260916"
-Fawn.Version="9.8.1-serotonin"
-Fawn.APIRevision=37
-Fawn.BuildId="fawnui-serotonin-9.8.1-pixel-polish-glass-wrap-20260916"
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
 Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
 Fawn.DynamicCapabilities.SurfaceMaterials=true
 Fawn.DynamicCapabilities.MotionStyles=true
@@ -6534,6 +6536,1027 @@ Fawn.DynamicCapabilities.WrappedBrandSubtitle=true
 Fawn.Runtime=Fawn.Runtime or{}
 Fawn.Runtime.PixelPolish98="single shell sidebar + glass-safe profile footer + wrapped brand subtitle + single-pass outlines"
 Fawn.__Polish98=true
-end)(Fawn)
+end
+__fawn_apply_981(Fawn)
+end
+
+-- Fawn Modern customization, storage and secondary-UI cleanup pass.
+do local function __fawn_apply_982(Fawn)
+local Window=Fawn.Classes.Window
+local Overlay=Fawn.Classes.Overlay
+local ESPPreview=Fawn.Classes.ESPPreview
+local Notification=Fawn.Classes.Notification
+local ROOT="Fawn Modern"
+local RELROOT=ROOT
+local PATHS={Root=ROOT,Configs=ROOT.."/configs",ProfilePictures=ROOT.."/Profile Pictures",LogoPictures=ROOT.."/logo pictures"}
+local REL={Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}
+local SECONDARY={Padding=12,Radius=10,RowGap=6,HeaderInset=12,AccentInset=9}
+local function cpy982(v,seen)
+    if type(v)~="table"then return v end
+    seen=seen or{};if seen[v]then return seen[v]end
+    local q={};seen[v]=q;for k,x in pairs(v)do q[cpy982(k,seen)]=cpy982(x,seen)end;return q
+end
+local function clamp982(v,a,b)v=tonumber(v)or a;if v<a then return a elseif v>b then return b end return v end
+local function round982(v)return math.floor((tonumber(v)or 0)+.5)end
+local function fs982()return type(file)=="table"and file or nil end
+local function callfs982(names,...)
+    local f=fs982();if not f then return false,nil end
+    for _,n in ipairs(names)do if type(f[n])=="function"then local ok,a,b,c=pcall(f[n],...);if ok then return true,a,b,c end end end
+    return false,nil
+end
+local function mkdir982(path)
+    local ok=callfs982({"mkdir","MakeDirectory","makeDirectory","CreateDirectory","createDirectory"},path)
+    return ok
+end
+local function ensure982()
+    mkdir982(ROOT);mkdir982(PATHS.Configs);mkdir982(PATHS.ProfilePictures);mkdir982(PATHS.LogoPictures)
+    return PATHS
+end
+local function basename982(p)
+    p=tostring(p or""):gsub("\\","/"):gsub("/+$","")
+    return p:match("([^/]+)$")or p
+end
+local function ext982(p)return lower((tostring(p or""):match("%.([^%.%/\\]+)$")or""))end
+local function normalizeList982(raw)
+    local out,seen={},{ }
+    if type(raw)=="string"then for s in raw:gmatch("[^\r\n]+")do local n=basename982(s);if n~=""and not seen[n]then seen[n]=true;out[#out+1]=n end end
+    elseif type(raw)=="table"then
+        for k,v in pairs(raw)do
+            local s
+            if type(v)=="string"then s=v elseif type(v)=="table"then s=v.path or v.Path or v.name or v.Name or v.file or v.File elseif type(k)=="string"and v==true then s=k end
+            if s then local n=basename982(s);if n~=""and not seen[n]then seen[n]=true;out[#out+1]=n end end
+        end
+    end
+    sort(out,function(a,b)return lower(a)<lower(b)end);return out
+end
+local function list982(path,kind)
+    ensure982();local f=fs982();if not f then return{}end
+    local raw=nil
+    for _,n in ipairs({"list","List","listdir","ListDirectory","listFiles","ListFiles","listfiles","GetFiles","getFiles","getfiles","enumerate","Enumerate","ls"})do
+        if type(f[n])=="function"then local ok,r=pcall(f[n],path);if ok and(type(r)=="table"or type(r)=="string")then raw=r;break end end
+    end
+    local out=normalizeList982(raw)
+    if kind=="image"then local q={}for _,n in ipairs(out)do local e=ext982(n);if e=="png"or e=="jpg"or e=="jpeg"or e=="bmp"or e=="webp"then q[#q+1]=n end end;out=q
+    elseif kind=="config"then local q={}for _,n in ipairs(out)do local e=ext982(n);if e=="lua"or e=="cfg"or e=="txt"or e=="json"then q[#q+1]=n end end;out=q end
+    return out
+end
+local function resolve982(kind,name)
+    name=tostring(name or""):gsub("\\","/")
+    if name==""then return""end
+    if name:match("^%a:[/\\]")or name:sub(1,1)=="/"then return name end
+    local base=PATHS[kind]or ROOT
+    if name:find("/",1,true)then
+        if name:sub(1,#RELROOT)==RELROOT then return"C:/Serotonin/files/"..name end
+        return name
+    end
+    return base.."/"..name
+end
+local function relConfig982(name)
+    name=tostring(name or""):gsub("\\","/")
+    if name==""then name="default.lua"end
+    if not name:find("%.[^/]+$")then name=name..".lua"end
+    if name:match("^%a:[/\\]")then return name end
+    if name:find("/",1,true)then return name end
+    return REL.Configs.."/"..name
+end
+local function fullConfig982(name)
+    local r=relConfig982(name);if r:match("^%a:[/\\]")then return r end;return"C:/Serotonin/files/"..r
+end
+
+Fawn.StoragePaths=cpy982(PATHS)
+Fawn.SecondaryMetrics=cpy982(SECONDARY)
+function Fawn:EnsureStorage()return ensure982()end
+function Fawn:GetStoragePaths()return cpy982(PATHS)end
+function Fawn:ListStorage(kind)
+    kind=tostring(kind or"Configs")
+    if kind=="Profiles"or kind=="Profile"then kind="ProfilePictures"elseif kind=="Logos"or kind=="Logo"then kind="LogoPictures"end
+    return list982(PATHS[kind]or ROOT,kind=="Configs"and"config"or(kind=="ProfilePictures"or kind=="LogoPictures")and"image"or nil)
+end
+function Fawn:ResolveStoragePath(kind,name)return resolve982(kind,name)end
+ensure982()
+
+local oldProfileImage982=Window.SetProfileImage
+function Window:SetProfileImage(v)
+    if type(v)=="string"and v~=""then v=resolve982("ProfilePictures",v)end
+    return oldProfileImage982(self,v)
+end
+local oldLogoImage982=Window.SetLogoImage
+function Window:SetLogoImage(v)
+    if type(v)=="string"and v~=""then v=resolve982("LogoPictures",v)end
+    return oldLogoImage982(self,v)
+end
+
+-- Hidden/profile-only tabs remain selectable but are omitted from sidebar navigation.
+local visibleTabs982=Window._visibleTabs
+function Window:_visibleTabs()
+    local base=visibleTabs982(self);local out={}
+    for _,t in ipairs(base)do if t.sidebarHidden~=true then out[#out+1]=t end end
+    return out
+end
+function Tab:SetSidebarHidden(v)self.sidebarHidden=v~=false;return self end
+function Tab:GetSidebarHidden()return self.sidebarHidden==true end
+
+-- Fully authored profile menu. SetProfileMenu() means exactly what the script supplies.
+local BUILTIN={
+    settings={label="Settings",icon="settings"},
+    profile={label="Profile",icon="user"},
+    center={label="Center UI",icon="misc"},
+    reset={label="Reset UI Position",icon="misc"},
+    resetstyle={label="Reset Appearance",icon="image"},
+    close={label="Close",icon="misc"},
+    destroy={label="Unload UI",icon="misc",danger=true}
+}
+local DEFAULT_MENU={"settings","profile","center","close"}
+local function menuVisible982(item,self)
+    local v=item.visible;if type(v)=="function"then local ok,r=pcall(v,self,item);return ok and r~=false end
+    return v~=false
+end
+local function menuEnabled982(item,self)
+    local v=item.enabled;if type(v)=="function"then local ok,r=pcall(v,self,item);return ok and r~=false end
+    return v~=false
+end
+local function makeBuiltin982(id,opt)
+    local b=BUILTIN[id];if not b then return nil end;opt=type(opt)=="table"and opt or{}
+    return{id=id,builtin=id,label=tostring(opt.label or b.label),icon=opt.icon or b.icon,danger=opt.danger~=nil and opt.danger or b.danger,visible=opt.visible,enabled=opt.enabled,closeOnClick=opt.closeOnClick~=false}
+end
+local function menuItems982(self)
+    local source=self.profileMenuExact
+    if type(source)~="table"then source=DEFAULT_MENU end
+    local out={}
+    for _,raw in ipairs(source)do
+        local item=nil
+        if type(raw)=="string"then item=makeBuiltin982(lower(raw))
+        elseif type(raw)=="table"then
+            if raw.separator then item={separator=true,label=raw.label,visible=raw.visible}
+            elseif raw.builtin then item=makeBuiltin982(lower(tostring(raw.builtin)),raw)
+            else item=raw end
+        end
+        if item and menuVisible982(item,self)then out[#out+1]=item end
+    end
+    if type(self.profileMenuExact)~="table"then for _,item in ipairs(self.profileMenuItems or{})do if menuVisible982(item,self)then out[#out+1]=item end end end
+    return out
+end
+local oldAddProfile982=Window.AddProfileMenuItem
+function Window:AddProfileMenuItem(label,callback,options)
+    options=type(options)=="table"and options or{}
+    local item={id=options.id,label=tostring(label or"Item"),callback=type(callback)=="function"and callback or nil,icon=options.icon or"misc",danger=options.danger==true,visible=options.visible,enabled=options.enabled,closeOnClick=options.closeOnClick~=false,meta=options.meta}
+    self.profileMenuItems=self.profileMenuItems or{};self.profileMenuItems[#self.profileMenuItems+1]=item;return item
+end
+function Window:AddProfileMenuSeparator(label,opt)
+    local item={separator=true,label=label,visible=type(opt)=="table"and opt.visible or nil};self.profileMenuItems=self.profileMenuItems or{};self.profileMenuItems[#self.profileMenuItems+1]=item;return item
+end
+function Window:AddProfileMenuBuiltin(id,opt)
+    local item=makeBuiltin982(lower(tostring(id or"")),opt);if item then self.profileMenuItems=self.profileMenuItems or{};self.profileMenuItems[#self.profileMenuItems+1]=item end;return item
+end
+function Window:SetProfileMenu(items,opt)
+    self.profileMenuExact={};for _,x in ipairs(type(items)=="table"and items or{})do self.profileMenuExact[#self.profileMenuExact+1]=x end
+    opt=type(opt)=="table"and opt or{};if opt.title~=nil then self.profileMenuTitle=tostring(opt.title)end;if opt.width~=nil then self.profileMenuWidth=tonumber(opt.width)end
+    self.profileMenuScroll=0;return self
+end
+function Window:UseDefaultProfileMenu(v)if v==false then self.profileMenuExact={}else self.profileMenuExact=nil end;self.profileMenuScroll=0;return self end
+function Window:SetProfileMenuTitle(v)self.profileMenuTitle=tostring(v or"");return self end
+function Window:SetProfileMenuWidth(v)self.profileMenuWidth=clamp982(tonumber(v)or 261,210,420);return self end
+function Window:GetResolvedProfileMenu()return cpy982(menuItems982(self))end
+function Window:GetProfileMenuItems()return self.profileMenuExact and cpy982(self.profileMenuExact)or cpy982(self.profileMenuItems or{})end
+function Window:RemoveProfileMenuItem(which)
+    local list=self.profileMenuExact or self.profileMenuItems or{};local idx=nil
+    if type(which)=="number"then idx=which else for i,item in ipairs(list)do if item==which or(type(item)=="table"and(item.id==which or item.label==which))then idx=i break end end end
+    if idx and list[idx]then table.remove(list,idx)end;return self
+end
+function Window:ClearProfileMenuItems()self.profileMenuItems={};if self.profileMenuExact then self.profileMenuExact={}end;return self end
+function Window:GetGlassTintStrength()return tonumber(self.glassTintStrength)or 0 end
+
+local function accountRect982(self)
+    local s=self.scale;local _,profileY=self:_sidebarGeometry();local items=menuItems982(self);local title=self.profileMenuTitle;if title==nil then title="ACCOUNT"end
+    local header=title~=""and 38*s or 10*s;local total=header+10*s
+    for _,it in ipairs(items)do total=total+(it.separator and 22*s or 38*s)end
+    local maxH=max(96*s,profileY-(self.y+12*s)-8*s);local h=min(total,maxH);local w=clamp982(tonumber(self.profileMenuWidth)or 261,210,420)*s
+    local p={x=self.x+7*s,w=w,h=h,y=profileY-h-8*s,items=items,header=header,total=total,maxScroll=max(0,total-h)}
+    self:_clampPopup(p);self._profilePopupRect=p;return p
+end
+function Window:_accountPopupRect()return accountRect982(self)end
+local function runBuiltin982(self,id,item)
+    if id=="settings"then local sp=Fawn:CreateSettingsPage(self,{showInSidebar=false});if sp and sp.Tab then sp.Tab.sidebarHidden=true;self:SelectTab(sp.Tab)end
+    elseif id=="profile"then if type(self.profileMenuProfileAction)=="function"then pcall(self.profileMenuProfileAction,self,item)elseif type(self.profileClick)=="function"then pcall(self.profileClick,self)end
+    elseif id=="center"or id=="reset"then self:Center()
+    elseif id=="resetstyle"then if type(self.ResetPolish)=="function"then self:ResetPolish()end;self:SetTheme("Modern Blue"):SetScale(1):SetOutlineStrength(1)
+    elseif id=="destroy"then self:Destroy()
+    elseif id=="close"then end
+end
+function Window:_drawAccountPopup()
+    if not self.accountOpen then self._profilePopupRect=nil return end
+    local s=self.scale;local p=accountRect982(self);self:_popupFrame(p)
+    local title=self.profileMenuTitle;if title==nil then title="ACCOUNT"end
+    if title~=""then textC(upper(title),p.x+SECONDARY.Padding*s,p.y+20*s,self:_color("muted"),13*s,"Verdana")end
+    if p.maxScroll>0 and self:_hit(p.x,p.y,p.w,p.h)and Input.wheel~=0 then self.profileMenuScroll=clamp982((self.profileMenuScroll or 0)+Input.wheel*34*s,0,p.maxScroll)end
+    self.profileMenuScroll=clamp982(self.profileMenuScroll or 0,0,p.maxScroll)
+    local y=p.y+p.header-(self.profileMenuScroll or 0);local bottom=p.y+p.h-6*s
+    for _,it in ipairs(p.items)do
+        if it.separator then
+            local rh=22*s;if y>=p.y+p.header-rh and y+rh<=bottom then local yy=y+rh*.5;line(p.x+SECONDARY.Padding*s,yy,p.x+p.w-SECONDARY.Padding*s,yy,self:_color("line"),1,32);if it.label and tostring(it.label)~=""then textC(upper(tostring(it.label)),p.x+SECONDARY.Padding*s,yy-7*s,self:_color("muted"),10*s,"Verdana")end end;y=y+rh
+        else
+            local rh=38*s;local drawRow=y>=p.y+p.header-rh and y+rh<=bottom;local enabled=menuEnabled982(it,self)
+            if drawRow then
+                local hx=p.x+6*s;local hw=p.w-12*s;local hov=enabled and self:_hit(hx,y,hw,rh-4*s)
+                if hov then self:_fill("control",hx,y,hw,rh-4*s,"controlHover",7*s)end
+                self:_icon(it.icon or"misc",p.x+22*s,y+(rh-4*s)*.5,14*s,enabled and(hov and"accent"or"icon")or"muted")
+                local col=it.danger and self:_color("danger")or self:_color(enabled and"text"or"muted")
+                textC(fit(tostring(it.label or"Item"),p.w-62*s,15*s,"Verdana"),p.x+40*s,y+(rh-4*s)*.5,col,15*s,"Verdana")
+                if Input.click and not self._consumed and hov then
+                    if it.builtin then runBuiltin982(self,it.builtin,it)elseif type(it.callback)=="function"then pcall(it.callback,self,it)end
+                    if it.closeOnClick~=false then self.accountOpen=false end;self:_consume()
+                end
+            end;y=y+rh
+        end
+    end
+    if p.maxScroll>0 then local tx=p.x+p.w-7*s;local trackTop=p.y+p.header;local trackH=max(10,p.h-p.header-8*s);local thumb=max(24*s,trackH*(p.h/p.total));local span=max(1,trackH-thumb);local ty=trackTop+span*((self.profileMenuScroll or 0)/p.maxScroll);rect(tx,trackTop,2*s,trackH,self:_color("control"),1*s,100);rect(tx-1*s,ty,4*s,thumb,self:_color("outline"),2*s,180)end
+end
+
+-- Save/load now owns the Fawn Modern storage root and preserves custom theme colors/assets.
+function SettingsPage:SetConfigPath(p)self.ConfigPath=relConfig982(p);return self end
+function SettingsPage:GetConfigPath()return self.ConfigPath end
+function SettingsPage:SaveConfig()
+    ensure982();local f=fs982();if not f or type(f.write)~="function"then self.Window:Notify("File API unavailable",{title="CONFIG"});return false end
+    local path=fullConfig982(self.ConfigPath);local dir=path:match("^(.*)/[^/]+$");if dir then mkdir982(dir)end
+    local ok,wrote=pcall(f.write,path,"return "..serialize(self.Window:GetConfig()));local good=ok and wrote~=false
+    self.Window:Notify(good and("Saved "..basename982(path))or"Config save failed",{title="CONFIG"});return good
+end
+function SettingsPage:LoadConfig()
+    ensure982();local f=fs982();if not f or type(f.read)~="function"then self.Window:Notify("File API unavailable",{title="CONFIG"});return false end
+    local path=fullConfig982(self.ConfigPath);local ok,str=pcall(f.read,path);if not ok or type(str)~="string"or str==""then self.Window:Notify("Config file not found",{title="CONFIG"});return false end
+    local fn=loadfn(str);if not fn then self.Window:Notify("Config compile failed",{title="CONFIG"});return false end
+    local ok2,data=pcall(fn);if not ok2 or type(data)~="table"then self.Window:Notify("Config data invalid",{title="CONFIG"});return false end
+    self.Window:LoadConfig(data);self.Window:Notify("Loaded "..basename982(path),{title="CONFIG"});return true
+end
+function SettingsPage:ShowConfigPath()local p=fullConfig982(self.ConfigPath);self.Window:Notify(p,{title="CONFIG PATH",duration=6});return p end
+function SettingsPage:ListConfigs()return list982(PATHS.Configs,"config")end
+function SettingsPage:ListProfilePictures()return list982(PATHS.ProfilePictures,"image")end
+function SettingsPage:ListLogoPictures()return list982(PATHS.LogoPictures,"image")end
+function SettingsPage:RefreshBrowsers()
+    local function opts(list,empty)local q={}for _,x in ipairs(list)do q[#q+1]=x end;if #q==0 then q[1]=empty end;return q end
+    if self.Controls.ConfigBrowser then self.Controls.ConfigBrowser:SetOptions(opts(self:ListConfigs(),"(no config files)"),{preserve="text"})end
+    if self.Controls.ProfileBrowser then self.Controls.ProfileBrowser:SetOptions(opts(self:ListProfilePictures(),"(no profile pictures)"),{preserve="text"})end
+    if self.Controls.LogoBrowser then self.Controls.LogoBrowser:SetOptions(opts(self:ListLogoPictures(),"(no logo pictures)"),{preserve="text"})end
+    return self
+end
+
+local getCfg982=Window.GetConfig
+function Window:GetConfig()
+    local q=getCfg982(self);q.themeColors=cpy982(self.theme);q.assets={profileImage=self.profileImagePath,logoImage=self.logoImagePath};q.profile={name=self.profileName,subtitle=self.profileSubtitle,brand=self.brand,brandSubtitle=self.subtitle};return q
+end
+local loadCfg982=Window.LoadConfig
+function Window:LoadConfig(cfg,silent)
+    loadCfg982(self,cfg,silent)
+    if type(cfg)=="table"then
+        if type(cfg.themeColors)=="table"then self.theme=cpy982(cfg.themeColors);self.themeName="Custom";if self.theme.outline then self.outlineColor=cpy982(self.theme.outline)end end
+        if type(cfg.profile)=="table"then if cfg.profile.name~=nil then self:SetProfileName(cfg.profile.name)end;if cfg.profile.subtitle~=nil then self:SetProfileSubtitle(cfg.profile.subtitle)end;if cfg.profile.brand~=nil then self.brand=tostring(cfg.profile.brand)end;if cfg.profile.brandSubtitle~=nil then self.subtitle=tostring(cfg.profile.brandSubtitle)end end
+        if type(cfg.assets)=="table"then if cfg.assets.profileImage and cfg.assets.profileImage~=""then self:SetProfileImage(cfg.assets.profileImage)end;if cfg.assets.logoImage and cfg.assets.logoImage~=""then self:SetLogoImage(cfg.assets.logoImage)end end
+    end
+    return self
+end
+
+-- New Settings implementation: materials live in Appearance, file browsing is native to Settings,
+-- and showInSidebar=false creates a profile-menu-only settings page.
+function Fawn:CreateSettingsPage(window,opt)
+    if window==self then window,opt=opt,nil end
+    if kind(window)~="Window"and kind(window)~="Panel"then error("CreateSettingsPage requires a Fawn Window")end
+    if window.settingsPage then return window.settingsPage end
+    ensure982();opt=type(opt)=="table"and opt or{}
+    local page=setmetatable({Window=window,Controls={},ConfigPath=relConfig982(opt.configPath or"default.lua"),Defaults=nil},SettingsPage)
+    local tab=window:Tab(opt.title or"Settings",{group=opt.group or"MISCELLANEOUS",icon="settings"});page.Tab=tab;tab.sidebarHidden=opt.showInSidebar==false or opt.profileOnly==true
+    local appearance=tab:Section("APPEARANCE",{column=1,row=1,sizeMode="auto"})
+    local behavior=tab:Section("BEHAVIOR",{column=2,row=1,sizeMode="auto"})
+    local profile=tab:Section("PROFILE & BRAND",{column=1,row=2,sizeMode="auto"})
+    local config=tab:Section("CONFIGURATION",{column=2,row=2,sizeMode="auto"})
+    local diagnostics=tab:Section("DIAGNOSTICS",{column=1,row=3,span=2,columns=2,sizeMode="auto"})
+    local ti=indexOf(Fawn.ThemeNames,window:GetThemeName())or 1
+    page.Controls.Theme=appearance:Dropdown("Theme",Fawn.ThemeNames,ti,{noConfig=true});page.Controls.Theme:OnChanged(function(v)window:SetTheme(v);if page._syncColors then page:_syncColors()end end)
+    page.Controls.Scale=appearance:Slider("UI Scale",55,165,round982(window:GetScale()*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.Scale:OnChanged(function(v)window:SetScale(v/100)end)
+    appearance:AddSeparator("MATERIAL")
+    local mats=Fawn.SurfaceStyles or{"Solid","Frosted","Acrylic","Smoke","Clear"};page.Controls.SurfaceStyle=appearance:Dropdown("Surface Material",mats,indexOf(mats,window.GetSurfaceStyle and window:GetSurfaceStyle()or"Solid")or 1,{noConfig=true});page.Controls.SurfaceStyle:OnChanged(function(v)if window.SetSurfaceStyle then window:SetSurfaceStyle(v)end;if page.Controls.Glass then page.Controls.Glass:Set(window:GetLiquidGlass(),true)end end)
+    page.Controls.Glass=appearance:Toggle("Liquid Glass",window:GetLiquidGlass(),{noConfig=true});page.Controls.Glass:OnChanged(function(v)window:SetLiquidGlass(v);if page.Controls.SurfaceStyle and window.GetSurfaceStyle then page.Controls.SurfaceStyle:Set(window:GetSurfaceStyle(),true)end end)
+    page.Controls.GlassOpacity=appearance:Slider("Glass Opacity",18,100,round982(window:GetGlassOpacity()*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.GlassOpacity:OnChanged(function(v)window:SetGlassOpacity(v/100)end)
+    if window.GetGlassTint then page.Controls.GlassTint=appearance:ColorPicker("Glass Tint",window:GetGlassTint(),{noConfig=true});page.Controls.GlassTint:OnChanged(function(v)window:SetGlassTint(v)end)end
+    if window.GetGlassTintStrength then page.Controls.GlassTintStrength=appearance:Slider("Tint Strength",0,65,round982(window:GetGlassTintStrength()*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.GlassTintStrength:OnChanged(function(v)window:SetGlassTintStrength(v/100)end)end
+    if window.SetSurfaceHighlights then page.Controls.SurfaceHighlights=appearance:Toggle("Glass Highlights",window.surfaceHighlights~=false,{noConfig=true});page.Controls.SurfaceHighlights:OnChanged(function(v)window:SetSurfaceHighlights(v)end)end
+    appearance:AddSeparator("GEOMETRY & OUTLINE")
+    local corners=Fawn.CornerPresets or{"Square","Tight","Soft","Round"};page.Controls.CornerPreset=appearance:Dropdown("Corner Preset",corners,indexOf(corners,"Round")or 1,{noConfig=true});page.Controls.CornerPreset:OnChanged(function(v)if window.SetCornerPreset then window:SetCornerPreset(v)end end)
+    if window.SetRadiusScale then page.Controls.RadiusScale=appearance:Slider("Radius Scale",45,165,round982((window.radiusScale or 1)*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.RadiusScale:OnChanged(function(v)window:SetRadiusScale(v/100)end)end
+    page.Controls.Outline=appearance:ColorPicker("Outline",window:GetOutlineColor(),{noConfig=true});page.Controls.Outline:OnChanged(function(v)window:SetOutlineColor(v);window:SetThemeColor("outline",v,true)end)
+    page.Controls.OutlineStrength=appearance:Slider("Outline Thickness",25,300,round982(window:GetOutlineStrength()*100),{noConfig=true,format=function(v)return format("%.2fx",v/100)end});page.Controls.OutlineStrength:OnChanged(function(v)window:SetOutlineStrength(v/100)end)
+    if window.SetOutlineOpacity then page.Controls.OutlineOpacity=appearance:Slider("Outline Opacity",15,100,round982((window.outlineOpacity or 1)*100),{noConfig=true,format=function(v)return round982(v).."%"end});page.Controls.OutlineOpacity:OnChanged(function(v)window:SetOutlineOpacity(v/100)end)end
+    appearance:AddSeparator("COLORS")
+    local colorDefs={{"Accent","accent"},{"Main Background","menuBg"},{"Card Background","card"},{"Control Background","control"},{"Control Hover","controlHover"},{"Active Item","activeItem"},{"Text","text"},{"Muted Text","muted"},{"Navigation Text","navText"},{"Popup","popup"},{"Avatar","avatar"},{"Danger","danger"},{"Success","success"},{"Warning","warning"}}
+    page.ColorControls={}
+    for _,d in ipairs(colorDefs)do local cp=appearance:ColorPicker(d[1],window:_color(d[2]),{noConfig=true});cp:OnChanged(function(v)window:SetThemeColor(d[2],v,true);if d[2]=="outline"then window:SetOutlineColor(v)end end);page.ColorControls[d[2]]=cp end
+    function page:_syncColors()for k,c in pairs(self.ColorControls or{})do c:Set(window:_color(k),true)end;if self.Controls.Outline then self.Controls.Outline:Set(window:GetOutlineColor(),true)end end
+    appearance:AddButton("Reset Appearance",function()window:SetTheme("Modern Blue"):SetScale(1):SetLiquidGlass(false):SetOutlineStrength(1);if window.ResetPolish then window:ResetPolish()end;page:_syncColors()end)
+
+    page.Controls.Smooth=behavior:Toggle("Smooth Scrolling",window.smoothScroll,{noConfig=true});page.Controls.Smooth:OnChanged(function(v)window:SetSmoothScroll(v)end)
+    page.Controls.Anim=behavior:Toggle("Animations",window.animations,{noConfig=true});page.Controls.Anim:OnChanged(function(v)window:SetAnimations(v)end)
+    if window.SetMotionStyle then local motions=Fawn.MotionStyles or{"Off","Minimal","Smooth","Snappy","Fluid"};page.Controls.MotionStyle=behavior:Dropdown("Animation Style",motions,indexOf(motions,window.motionStyle or"Smooth")or 1,{noConfig=true});page.Controls.MotionStyle:OnChanged(function(v)window:SetMotionStyle(v)end)end
+    page.Controls.MotionSpeed=behavior:Slider("Animation Speed",4,30,round982(window.animationSpeed or 10),{noConfig=true});page.Controls.MotionSpeed:OnChanged(function(v)window:SetAnimationSpeed(v)end)
+    if window.SetHoverAnimations then page.Controls.HoverAnimations=behavior:Toggle("Animated Hovers",window.hoverAnimations~=false,{noConfig=true});page.Controls.HoverAnimations:OnChanged(function(v)window:SetHoverAnimations(v)end)end
+    if window.SetSwitchAnimations then page.Controls.SwitchAnimations=behavior:Toggle("Animated Switches",window.switchAnimations~=false,{noConfig=true});page.Controls.SwitchAnimations:OnChanged(function(v)window:SetSwitchAnimations(v)end)end
+    page.Controls.ScrollSpeed=behavior:Slider("Scroll Speed",1,30,window:GetScrollSpeed(),{noConfig=true});page.Controls.ScrollSpeed:OnChanged(function(v)window:SetScrollSpeed(v)end)
+    local np=indexOf(Fawn.NotificationPositions,window:GetNotificationPosition())or 4;page.Controls.Notifications=behavior:Dropdown("Notification Corner",Fawn.NotificationPositions,np,{noConfig=true});page.Controls.Notifications:OnChanged(function(v)window:SetNotificationPosition(v)end)
+    page.Controls.MenuKey=behavior:Keybind("Menu Key",window.toggleKey,{label=window.toggleLabel,mode="Toggle",keyboardOnly=true,keybindList=false,noConfig=true});page.Controls.MenuKey:OnKeyChanged(function(k,l)window:SetToggleKey(k,l)end)
+    behavior:AddButtonPair("Center UI",function()window:Center()end,"Default Size",function()window:SetSize(REF.Width,REF.Height)end)
+
+    page.Controls.ProfileName=profile:Input("Username",window.profileName,{placeholder="User",noConfig=true});page.Controls.ProfileName:OnChanged(function(v)window:SetProfileName(v)end)
+    page.Controls.ProfileSub=profile:Input("Subtitle",window.profileSubtitle,{placeholder="Developer",noConfig=true});page.Controls.ProfileSub:OnChanged(function(v)window:SetProfileSubtitle(v)end)
+    profile:AddSeparator("PROFILE PICTURE")
+    local pfiles=page:ListProfilePictures();if #pfiles==0 then pfiles={"(no profile pictures)"}end
+    page.Controls.ProfileBrowser=profile:Dropdown("Profile Picture",pfiles,1,{noConfig=true});page.Controls.ProfileBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then window:SetProfileImage(v)end end)
+    profile:AddButtonPair("Refresh Pictures",function()page:RefreshBrowsers()end,"Clear Avatar",function()window:ClearProfileImage()end)
+    page.Controls.ProfilePath=profile:Input("Profile file",window.profileImagePath and basename982(window.profileImagePath)or"",{placeholder="avatar.png",noConfig=true,maxLength=260});profile:AddButton("Apply Profile File",function()window:SetProfileImage(page.Controls.ProfilePath:Get())end)
+    profile:AddSeparator("BRAND & LOGO")
+    page.Controls.Brand=profile:Input("Brand Title",window.brand,{noConfig=true});page.Controls.Brand:OnChanged(function(v)window.brand=v end)
+    page.Controls.Subtitle=profile:Input("Brand Subtitle",window.subtitle,{noConfig=true});page.Controls.Subtitle:OnChanged(function(v)window.subtitle=v end)
+    local lfiles=page:ListLogoPictures();if #lfiles==0 then lfiles={"(no logo pictures)"}end
+    page.Controls.LogoBrowser=profile:Dropdown("Logo Picture",lfiles,1,{noConfig=true});page.Controls.LogoBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then window:SetLogoImage(v)end end)
+    profile:AddButtonPair("Refresh Logos",function()page:RefreshBrowsers()end,"Clear Logo",function()window:ClearLogoImage()end)
+    page.Controls.LogoPath=profile:Input("Logo file",window.logoImagePath and basename982(window.logoImagePath)or"",{placeholder="logo.png",noConfig=true,maxLength=260});profile:AddButton("Apply Logo File",function()window:SetLogoImage(page.Controls.LogoPath:Get())end)
+
+    local cfgs=page:ListConfigs();if #cfgs==0 then cfgs={"(no config files)"}end
+    page.Controls.ConfigBrowser=config:Dropdown("Config File",cfgs,1,{noConfig=true});page.Controls.ConfigBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then page:SetConfigPath(v)end end)
+    page.Controls.ConfigName=config:Input("New Config Name","default.lua",{placeholder="default.lua",noConfig=true,maxLength=96})
+    config:AddButtonPair("Save As",function()page:SetConfigPath(page.Controls.ConfigName:Get());page:SaveConfig();page:RefreshBrowsers()end,"Load Selected",function()local v=page.Controls.ConfigBrowser:Get();if v and v:sub(1,1)~="("then page:SetConfigPath(v);page:LoadConfig()end end)
+    config:AddButtonPair("Refresh Files",function()page:RefreshBrowsers()end,"Show Path",function()page:ShowConfigPath()end)
+    config:AddSeparator("IN-MEMORY PROFILES")
+    config:AddButtonPair("Save Current",function()window:SaveNamedConfig(window.configName);window:Notify("Named config saved",{title="CONFIG"})end,"Duplicate",function()local n=window:DuplicateNamedConfig();window:Notify("Created "..n,{title="CONFIG"})end)
+    config:AddValue("Configs Folder",REL.Configs,{muted=true,wrap=true,maxLines=2})
+
+    diagnostics:AddValue("Paint Frames",function()return Fawn:GetPaintCount()end,{controlColumn=1});diagnostics:AddValue("Paint Errors",function()return Fawn:GetPaintErrors()end,{controlColumn=1})
+    diagnostics:AddValue("Draw Errors",function()return E.drawErrors end,{controlColumn=2});diagnostics:AddValue("Window Size",function()local w,h=window:GetSize();return round982(w).." x "..round982(h)end,{controlColumn=2});diagnostics:AddValue("Scale",function()return round982(window:GetScale()*100).."%"end,{controlColumn=2})
+    diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Modern secondary UI spacing + notification accent test.",{title="DIAGNOSTICS"})end,{controlColumn=2})
+    page:CaptureDefaults();window.settingsPage=page;page:RefreshBrowsers();return page
+end
+
+-- Keep rounded Section geometry even when a page clip cuts through the card. Also avoid the
+-- translucent scrollbar-gutter repaint that produced darker edge strips in Liquid Glass.
+function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
+    local sec=box.section;local s=self.scale;local cardTop=box.cardY;local cardBottom=cardTop+box.cardH
+    local clipL=max(bodyLeft or box.x,box.x);local clipR=min(bodyRight or(box.x+box.w),box.x+box.w);local clipT=max(bodyTop,cardTop);local clipB=min(bodyBottom,cardBottom)
+    if clipB<=clipT or clipR<=clipL then return end
+    if sec._scrollDrag then if Input.left and sec.maxScroll>0 then local rr=snapRatio96((Input.my-sec._scrollDrag.top-sec._scrollDrag.off)/max(1,sec._scrollDrag.span));sec.scrollTarget=rr*sec.maxScroll;sec.scroll=sec.scrollTarget else sec._scrollDrag=nil;sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)end else sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)end
+    local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5);self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
+    local rows={}for c,r in pairs(box.layouts)do rows[#rows+1]={c=c,r=r}end;sort(rows,function(a,b)if a.r.y==b.r.y then return a.r.x<b.r.x end return a.r.y<b.r.y end);local offset=sec.scroll or 0
+    for _,q in ipairs(rows)do local r={x=q.r.x,y=q.r.y-offset,w=q.r.w,h=q.r.h};if r.y>=clipT-.25 and r.y+r.h<=clipB+.25 and r.x>=clipL-.25 and r.x+r.w<=clipR+.25 then self:_drawControl(q.c,r,clipT,clipB)end end
+    if sec.columnDividers==true and sec.columns and sec.columns>1 then local gap=(sec.controlGap or 12)*s;local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s);local cw=(usable-gap*(sec.columns-1))/sec.columns;for i=1,sec.columns-1 do local x=box.x+i*cw+(i-.5)*gap;local y1=max(clipT+8*s,cardTop+8*s);local y2=min(clipB-8*s,cardBottom-8*s);if y2>y1 then line(x,y1,x,y2,self:_color("line"),1,14)end end end
+    if sec.maxScroll>1 then
+        local gutter=REF.SectionScrollbarGutter*s;local gx=box.x+box.w-gutter;local tx=gx+gutter*.5;local top=clipT+9*s;local bh=max(1,clipB-clipT-18*s);local thumb=max(28*s,bh*(box.cardH/max(box.cardH,box.contentH)));local span=max(1,bh-thumb);local ratio=sec.maxScroll>0 and snapRatio96((sec.scroll or 0)/sec.maxScroll)or 0;local ty=top+span*ratio;local trackHover=self:_hit(gx,clipT,gutter,clipB-clipT);local thumbHover=self:_hit(gx,ty-3*s,gutter,thumb+6*s);local active=sec._scrollDrag~=nil
+        if trackHover or active then rect(tx-1*s,top,2*s,bh,self:_color("controlHover"),1*s,88)end;rect(tx-((active or thumbHover)and 2*s or 1.5*s),ty,(active or thumbHover)and 4*s or 3*s,thumb,self:_color((active or thumbHover)and"accent"or"outline"),2*s,(active or thumbHover)and 255 or 180)
+        if Input.click and not self._consumed and not self:_hasPopup()and thumbHover then sec._scrollDrag={top=top,span=span,off=Input.my-ty};self:_consume()end
+    else sec._scrollDrag=nil;sec.scroll,sec.scrollTarget=0,0 end
+    self:_out(clipL,clipT,clipR-clipL,clipB-clipT,rr,.82,self:_color("outline"),112)
+    local titleY=box.y+7*s;if titleY>=bodyTop-20*s and titleY<=bodyBottom and box.x>=bodyLeft-1 and box.x<=(bodyRight or box.x+box.w)then textC(fit(upper(sec.name),max(20,box.w-44*s),14*s,"Verdana"),box.x+22*s,titleY,self:_color("muted"),14*s,"Verdana")end
+end
+
+-- ESP element capture gets a larger hit target, wins over standalone frame dragging while active,
+-- and keeps pointer ownership for the entire drag.
+local espHit982=ESPPreview._hitESP
+function ESPPreview:SetElementDragPadding(v)self.elementDragPadding=clamp982(tonumber(v)or 6,0,20);return self end
+function ESPPreview:_hitESP(mx,my,x,y,w,h)
+    local s=self.window and self.window.scale or 1;local p=(self.elementDragPadding or 6)*s
+    return mx>=x-p and mx<x+w+p and my>=y-p and my<y+h+p
+end
+local espRender982=ESPPreview._render
+function ESPPreview:_render()
+    if self.docked or not self.visible or self.destroyed then return end
+    local s=overlayScale(self);local w=self.width*s;local h=self.height*s
+    self:_drawBody(self.x,self.y,w,h,false)
+    if self._espDrag then E.pointerConsumed=true;return end
+    self:_drag(self.x,self.y,w,h,42*s)
+end
+
+-- Secondary frames share one padding/radius contract; header dividers never touch rounded corners.
+function Window:_popupFrame(p)
+    local s=self.scale;local r=SECONDARY.Radius*s;self:_fill("popup",p.x,p.y,p.w,p.h,"popup",r);self:_out(p.x,p.y,p.w,p.h,r,.9,self:_color("outline"),145)
+end
+if Overlay then
+function Overlay:_frame(x,y,w,h,header)
+    local s=overlayScale(self);local win=self.window;local r=SECONDARY.Radius*s
+    if win then win:_fill("overlay",x,y,w,h,"popup",r);win:_out(x,y,w,h,r,.9,win.outlineColor or self:_theme("outline"),145)
+    else rect(x,y,w,h,self:_theme("popup"),r,245);outline(x,y,w,h,self:_theme("outline"),r,145,max(.8,s))end
+    if header then local inset=SECONDARY.HeaderInset*s;line(x+inset,y+header,x+w-inset,y+header,self:_theme("line"),max(.75,s*.7),38)end
+end
+end
+
+-- Notification accent is an inset pill, so it belongs to the card instead of cutting through its radius.
+function Notification:_render(index)
+    if self.dismissed or self.destroyed then return false end;local now=nowMs();if now>=self.expires then self.dismissed=true;return false end
+    local win=self.window;local s=win and win.scale or 1;local w=self.width*s;local pad=14*s;local accentGap=9*s;local textXPad=pad+7*s
+    local titleH=self.title~=""and 21*s or 0;local maxText=max(40,w-textXPad-pad);local lines=self.wrap~=false and wrapText(self.text,maxText,14*s,"Verdana",self.maxLines)or{fit(self.text,maxText,14*s,"Verdana")};local lh=18*s;local h=pad*2+titleH+#lines*lh
+    local x,y=notificationAnchor(self.position,w,h,index,8*s);local t=win and win.theme or MODERN;local r=SECONDARY.Radius*s
+    if win then win:_fill("overlay",x,y,w,h,"popup",r);win:_out(x,y,w,h,r,.9,win.outlineColor or t.outline,145)else rect(x,y,w,h,t.popup,r,245);outline(x,y,w,h,t.outline,r,145,max(.8,s))end
+    local ah=max(8*s,h-accentGap*2);rect(x+accentGap,y+accentGap,3*s,ah,t.accent,1.5*s,245)
+    local yy=y+pad;if self.title~=""then text(self.title,x+textXPad,yy,t.text,14*s,"Verdana");yy=yy+titleH end;for i,l in ipairs(lines)do text(l,x+textXPad,yy+(i-1)*lh,t.navText,14*s,"Verdana")end;return true
+end
+
+-- Main render only changes popup hit-testing: profile menu bounds are dynamic now.
+function Window:_render()
+    if self.destroyed then return end
+    if self._pendingScale then local q=self._pendingScale;self._pendingScale=nil;self._inRender=false;self:SetScale(q)end
+    self:_toggleByKey();self:_processKeybinds();self:_processBindCapture();self:_processInputEdit();self:_processSliderEdit();if not self.visible then return end
+    self._inRender=true;self._consumed=false;self:_updateWindowDragResize();local s=self.scale;local X,Y=self.x,self.y;local W,H=self.width*s,self.height*s;local I=Fawn.GetInputState and Fawn:GetInputState()or{}
+    if (I.click or I.rightClick)and not self._consumed and self:_hasPopup()then
+        local inside=false;for _,p in pairs({self.openDrop,self.extraPopup,self.keyMenu,self.colorPopup,self.colorMenu,self.configPopup,self.groupPopup})do if p and p.x and p.y and p.w and p.h and self:_hit(p.x,p.y,p.w,p.h)then inside=true break end end
+        if self.accountOpen then local p=self._profilePopupRect or accountRect982(self);local _,py=self:_sidebarGeometry();if self:_hit(p.x,p.y,p.w,p.h)or self:_hit(X+15*s,py,245*s,55*s)then inside=true end end
+        if self.searchOpen then local sw=310*s;local sx=X+(self.width-(REF.RightMargin or 32))*s-sw;local sy=Y+78*s;if self:_hit(sx,sy,sw,44*s)then inside=true end end
+        if not inside then self:_closePopups();self:_consume()end
+    end
+    self:_fill("main",X,Y,W,H,"menuBg",(self.corner or 22)*s);self:_drawContent();if self.kind=="Panel"or self.tabBarVisible==false then self:_drawPanelHeader()else self:_drawSidebar();self:_drawTopbar()end
+    self:_out(X,Y,W,H,(self.corner or 22)*s,self.borderThickness,self.outlineColor,255)
+    if self._drawExtraPopup then self:_drawExtraPopup()end;self:_drawDropdownPopup();self:_drawKeyMenu();self:_drawColorPopup();if self._drawColorMenu then self:_drawColorMenu()end;self:_drawConfigPopup();self:_drawGroupPopup();self:_drawAccountPopup();self:_drawSearchPopup();self._inRender=false
+end
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
+Fawn.DynamicCapabilities.ProfileMenuAuthoring=true
+Fawn.DynamicCapabilities.ManagedStorage=true
+Fawn.DynamicCapabilities.SettingsFileBrowser=true
+Fawn.DynamicCapabilities.ThemeColorEditor=true
+Fawn.DynamicCapabilities.HiddenSettingsTab=true
+Fawn.DynamicCapabilities.RoundedClippedSections=true
+Fawn.DynamicCapabilities.InsetNotificationAccent=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.StorageRoot=ROOT
+Fawn.Runtime.ProfileMenu="fully authored built-ins/custom rows/separators + dynamic sizing/scroll"
+Fawn.Runtime.SecondaryUI="uniform popup/overlay padding, inset dividers and rounded notification accents"
+Fawn.Runtime.ContainerCorners="rounded visible slices + corrected row boundary clipping + no translucent scrollbar gutter overdraw"
+Fawn.Runtime.ESPElementDrag="expanded hit targets + drag capture wins over frame drag"
+end
+__fawn_apply_982(Fawn)
+end
+
+
+-- Fawn Modern preset-settings + sandbox-correct managed storage pass.
+do local function __fawn_apply_983(Fawn)
+local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
+local SettingsPage=assert(Fawn.Classes and Fawn.Classes.SettingsPage,"Fawn SettingsPage class missing")
+local ROOT="Fawn Modern"
+local PATHS={Root=ROOT,Configs=ROOT.."/configs",ProfilePictures=ROOT.."/Profile Pictures",LogoPictures=ROOT.."/logo pictures"}
+local function cp983(v,seen)
+    if type(v)~="table"then return v end
+    seen=seen or{};if seen[v]then return seen[v]end
+    local q={};seen[v]=q;for k,x in pairs(v)do q[cp983(k,seen)]=cp983(x,seen)end;return q
+end
+local function fs983()return type(file)=="table"and file or nil end
+local function mkdir983(path)
+    local f=fs983();if not f then return false end
+    for _,n in ipairs{"mkdir","Mkdir","MakeDirectory","makeDirectory","CreateDirectory","createDirectory"}do
+        if type(f[n])=="function"then local ok,r=pcall(f[n],path);if ok and r~=false then return true end end
+    end
+    return false
+end
+local function ensure983()
+    mkdir983(ROOT);mkdir983(PATHS.Configs);mkdir983(PATHS.ProfilePictures);mkdir983(PATHS.LogoPictures)
+    return cp983(PATHS)
+end
+local function base983(p)p=tostring(p or""):gsub("\\","/"):gsub("/+$","");return p:match("([^/]+)$")or p end
+local function ext983(p)return lower((tostring(p or""):match("%.([^%.%/\\]+)$")or""))end
+local function list983(path,kind)
+    ensure983();local f=fs983();if not f then return{}end;local raw
+    for _,n in ipairs{"list","List","listdir","ListDir","ListDirectory","listFiles","ListFiles","listfiles","GetFiles","getFiles","getfiles","enumerate","Enumerate","ls"}do
+        if type(f[n])=="function"then local ok,r=pcall(f[n],path);if ok and(type(r)=="table"or type(r)=="string")then raw=r;break end end
+    end
+    local out,seen={},{}
+    local function add(v)
+        if type(v)=="table"then v=v.path or v.Path or v.name or v.Name or v.file or v.File end
+        if type(v)~="string"then return end
+        local n=base983(v);if n==""or seen[n]then return end
+        local e=ext983(n)
+        if kind=="image"and not(e=="png"or e=="jpg"or e=="jpeg"or e=="bmp"or e=="webp")then return end
+        if kind=="config"and not(e=="lua"or e=="cfg"or e=="txt"or e=="json")then return end
+        seen[n]=true;out[#out+1]=n
+    end
+    if type(raw)=="table"then for k,v in pairs(raw)do if type(k)=="string"and v==true then add(k)else add(v)end end
+    elseif type(raw)=="string"then for s in raw:gmatch("[^\r\n]+")do add(s)end end
+    sort(out,function(a,b)return lower(a)<lower(b)end);return out
+end
+local function path983(kind,name)
+    name=tostring(name or""):gsub("\\","/")
+    if name==""then return""end
+    if name:sub(1,#ROOT)==ROOT then return name end
+    local base=PATHS[kind]or ROOT
+    if name:find("/",1,true)then return name end
+    return base.."/"..name
+end
+local function cfg983(name)
+    name=tostring(name or"default.lua"):gsub("\\","/")
+    if name==""then name="default.lua"end
+    if not name:find("%.[^/]+$")then name=name..".lua"end
+    if name:sub(1,#PATHS.Configs)==PATHS.Configs then return name end
+    if name:find("/",1,true)then return name end
+    return PATHS.Configs.."/"..name
+end
+local function display983(path)
+    local f=fs983();local root=nil
+    if f and type(f.root)=="function"then local ok,r=pcall(f.root);if ok and type(r)=="string"and r~=""then root=r:gsub("\\","/"):gsub("/+$","")end end
+    return root and(root.."/"..path)or path
+end
+
+Fawn.StoragePaths=cp983(PATHS)
+function Fawn:EnsureStorage()return ensure983()end
+function Fawn:GetStoragePaths()return cp983(PATHS)end
+function Fawn:GetStorageDisplayPaths()local q={}for k,v in pairs(PATHS)do q[k]=display983(v)end return q end
+function Fawn:ListStorage(kind)
+    kind=tostring(kind or"Configs");if kind=="Profiles"or kind=="Profile"then kind="ProfilePictures"elseif kind=="Logos"or kind=="Logo"then kind="LogoPictures"end
+    return list983(PATHS[kind]or ROOT,kind=="Configs"and"config"or(kind=="ProfilePictures"or kind=="LogoPictures")and"image"or nil)
+end
+function Fawn:ResolveStoragePath(kind,name)return path983(kind,name)end
+ensure983()
+
+local pimg983=Window.SetProfileImage
+function Window:SetProfileImage(v)if type(v)=="string"and v~=""then v=path983("ProfilePictures",v)end return pimg983(self,v)end
+local logo983=Window.SetLogoImage
+function Window:SetLogoImage(v)if type(v)=="string"and v~=""then v=path983("LogoPictures",v)end return logo983(self,v)end
+
+function SettingsPage:SetConfigPath(p)self.ConfigPath=cfg983(p);return self end
+function SettingsPage:GetConfigPath()return self.ConfigPath end
+function SettingsPage:SaveConfig()
+    ensure983();local f=fs983();if not f or type(f.write)~="function"then self.Window:Notify("File API unavailable",{title="CONFIG"});return false end
+    local p=cfg983(self.ConfigPath);self.ConfigPath=p;local ok,wrote=pcall(f.write,p,"return "..serialize(self.Window:GetConfig()));local good=ok and wrote~=false
+    self.Window:Notify(good and("Saved "..base983(p))or"Config save failed",{title="CONFIG"});if good and self.RefreshBrowsers then self:RefreshBrowsers()end;return good
+end
+function SettingsPage:LoadConfig()
+    ensure983();local f=fs983();if not f or type(f.read)~="function"then self.Window:Notify("File API unavailable",{title="CONFIG"});return false end
+    local p=cfg983(self.ConfigPath);self.ConfigPath=p;local ok,str=pcall(f.read,p);if not ok or type(str)~="string"or str==""then self.Window:Notify("Config file not found",{title="CONFIG"});return false end
+    local fn=loadfn(str);if not fn then self.Window:Notify("Config compile failed",{title="CONFIG"});return false end
+    local ok2,data=pcall(fn);if not ok2 or type(data)~="table"then self.Window:Notify("Config data invalid",{title="CONFIG"});return false end
+    self.Window:LoadConfig(data);self.Window:Notify("Loaded "..base983(p),{title="CONFIG"});return true
+end
+function SettingsPage:ShowConfigPath()local p=display983(cfg983(self.ConfigPath));self.Window:Notify(p,{title="CONFIG PATH",duration=6});return p end
+function SettingsPage:ListConfigs()return list983(PATHS.Configs,"config")end
+function SettingsPage:ListProfilePictures()return list983(PATHS.ProfilePictures,"image")end
+function SettingsPage:ListLogoPictures()return list983(PATHS.LogoPictures,"image")end
+
+-- Reusable preset settings: hidden from sidebar by default and optionally mounted in the profile menu.
+function Fawn:CreatePresetSettingsMenu(window,opt)
+    if window==self then window,opt=opt,nil end
+    opt=type(opt)=="table"and cp983(opt)or{}
+    opt.showInSidebar=opt.showInSidebar==true
+    opt.profileOnly=opt.showInSidebar~=true
+    opt.title=opt.title or"Settings";opt.group=opt.group or"MISCELLANEOUS";opt.configPath=opt.configPath or"default.lua"
+    local page=self:CreateSettingsPage(window,opt)
+    if page and page.Tab and opt.showInSidebar~=true then page.Tab.sidebarHidden=true end
+    if opt.profileEntry~=false and window and type(window.AddProfileMenuBuiltin)=="function"then
+        local item={builtin="settings",label=opt.profileLabel or"Settings",icon=opt.profileIcon or"settings"}
+        if opt.profileMenuOnly==true then window:SetProfileMenu({item},{title=opt.profileMenuTitle or"PROFILE",width=opt.profileMenuWidth or 261})
+        else
+            local exact=window.profileMenuExact
+            if type(exact)=="table"then
+                local found=false;for _,v in ipairs(exact)do if v=="settings"or(type(v)=="table"and v.builtin=="settings")then found=true break end end
+                if not found then exact[#exact+1]=item end
+            end
+        end
+    end
+    window.presetSettingsPage=page
+    return page
+end
+function Window:AddPresetSettingsMenu(opt)return Fawn:CreatePresetSettingsMenu(self,opt)end
+Window.CreatePresetSettingsMenu=Window.AddPresetSettingsMenu
+function Window:GetPresetSettingsMenu()return self.presetSettingsPage or self.settingsPage end
+function Window:OpenPresetSettings()
+    local p=self:GetPresetSettingsMenu()or self:AddPresetSettingsMenu({profileEntry=false})
+    if p and p.Tab then self:SelectTab(p.Tab)end;self.accountOpen=false;return p
+end
+function Window:AttachSettingsToProfile(opt)
+    opt=type(opt)=="table"and opt or{};local p=self:GetPresetSettingsMenu()or self:AddPresetSettingsMenu({profileEntry=false,configPath=opt.configPath})
+    local item={builtin="settings",label=opt.label or"Settings",icon=opt.icon or"settings"}
+    if opt.only~=false then self:SetProfileMenu({item},{title=opt.title or"PROFILE",width=opt.width or 261})else self:AddProfileMenuBuiltin("settings",item)end
+    return p
+end
+
+local createWin983=Fawn.CreateWindow
+function Fawn:CreateWindow(opt)
+    opt=type(opt)=="table"and opt or{};local w=createWin983(self,opt)
+    local ps=opt.presetSettings or opt.settingsPreset
+    if ps then local q=type(ps)=="table"and cp983(ps)or{};if q.profileMenuOnly==nil then q.profileMenuOnly=true end;w:AddPresetSettingsMenu(q)end
+    return w
+end
+local createPanel983=Fawn.CreatePanel
+function Fawn:CreatePanel(opt)
+    opt=type(opt)=="table"and opt or{};local w=createPanel983(self,opt)
+    local ps=opt.presetSettings or opt.settingsPreset
+    if ps then local q=type(ps)=="table"and cp983(ps)or{};if q.profileEntry==nil then q.profileEntry=false end;w:AddPresetSettingsMenu(q)end
+    return w
+end
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
+Fawn.DynamicCapabilities.PresetSettingsMenu=true
+Fawn.DynamicCapabilities.ProfileMenuAuthoring=true
+Fawn.DynamicCapabilities.ManagedStorage=true
+Fawn.DynamicCapabilities.SettingsFileBrowser=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.StorageRoot=ROOT
+Fawn.Runtime.StoragePaths=cp983(PATHS)
+Fawn.Runtime.PresetSettings="Window:AddPresetSettingsMenu / presetSettings window option / profile-only mounting"
+Fawn.ProductName="Fawn Modern"
+Fawn.DisplayName="Fawn Modern"
+Fawn.Namespace="FawnModern"
+-- numeric build identity intentionally omitted
+end
+__fawn_apply_983(Fawn)
+end
+
+
+-- HOTFIX3: restore Section control rendering while preserving rounded visible slices.
+-- The previous strict fully-contained-row gate could reject controls on scaled/fractional layouts.
+do
+local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
+function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
+    local sec=box.section
+    local s=self.scale
+    local cardTop=box.cardY
+    local cardBottom=cardTop+box.cardH
+    local clipL=max(bodyLeft or box.x,box.x)
+    local clipR=min(bodyRight or(box.x+box.w),box.x+box.w)
+    local clipT=max(bodyTop,cardTop)
+    local clipB=min(bodyBottom,cardBottom)
+    if clipB<=clipT or clipR<=clipL then return end
+
+    if sec._scrollDrag then
+        if Input.left and sec.maxScroll>0 then
+            local rr=snapRatio96((Input.my-sec._scrollDrag.top-sec._scrollDrag.off)/max(1,sec._scrollDrag.span))
+            sec.scrollTarget=rr*sec.maxScroll
+            sec.scroll=sec.scrollTarget
+        else
+            sec._scrollDrag=nil
+            sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)
+        end
+    else
+        sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)
+    end
+
+    local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5)
+    self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
+
+    local rows={}
+    for c,r in pairs(box.layouts or{})do rows[#rows+1]={c=c,r=r}end
+    sort(rows,function(a,b)if a.r.y==b.r.y then return a.r.x<b.r.x end return a.r.y<b.r.y end)
+
+    local offset=sec.scroll or 0
+    for _,q in ipairs(rows)do
+        local r={x=q.r.x,y=q.r.y-offset,w=q.r.w,h=q.r.h}
+        self:_drawControl(q.c,r,clipT,clipB)
+    end
+
+    if sec.columnDividers==true and sec.columns and sec.columns>1 then
+        local gap=(sec.controlGap or 12)*s
+        local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s)
+        local cw=(usable-gap*(sec.columns-1))/sec.columns
+        for i=1,sec.columns-1 do
+            local x=box.x+i*cw+(i-.5)*gap
+            local y1=max(clipT+8*s,cardTop+8*s)
+            local y2=min(clipB-8*s,cardBottom-8*s)
+            if y2>y1 then line(x,y1,x,y2,self:_color("line"),1,14)end
+        end
+    end
+
+    if sec.maxScroll>1 then
+        local gutter=REF.SectionScrollbarGutter*s
+        local gx=box.x+box.w-gutter
+        local tx=gx+gutter*.5
+        local top=clipT+9*s
+        local bh=max(1,clipB-clipT-18*s)
+        local thumb=max(28*s,bh*(box.cardH/max(box.cardH,box.contentH)))
+        local span=max(1,bh-thumb)
+        local ratio=sec.maxScroll>0 and snapRatio96((sec.scroll or 0)/sec.maxScroll)or 0
+        local ty=top+span*ratio
+        local thumbHover=self:_hit(gx,ty-3*s,gutter,thumb+6*s)
+        local trackHover=self:_hit(gx,clipT,gutter,clipB-clipT)
+        local active=sec._scrollDrag~=nil
+        if trackHover or active then rect(tx-1*s,top,2*s,bh,self:_color("controlHover"),1*s,88)end
+        rect(tx-((active or thumbHover)and 2*s or 1.5*s),ty,(active or thumbHover)and 4*s or 3*s,thumb,self:_color((active or thumbHover)and"accent"or"outline"),2*s,(active or thumbHover)and 255 or 180)
+        if Input.click and not self._consumed and not self:_hasPopup()and thumbHover then
+            sec._scrollDrag={top=top,span=span,off=Input.my-ty}
+            self:_consume()
+        end
+    else
+        sec._scrollDrag=nil
+        sec.scroll,sec.scrollTarget=0,0
+    end
+
+    self:_out(clipL,clipT,clipR-clipL,clipB-clipT,rr,.82,self:_color("outline"),112)
+
+    local titleY=box.y+7*s
+    if titleY>=bodyTop-20*s and titleY<=bodyBottom then
+        textC(fit(upper(sec.name),max(20,box.w-44*s),14*s,"Verdana"),box.x+22*s,titleY,self:_color("muted"),14*s,"Verdana")
+    end
+end
+-- numeric build identity intentionally omitted
+-- numeric build identity intentionally omitted
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.SectionControlHotfix="rows always reach _drawControl; rounded visible card slice + final outline"
+end
+
+
+-- Fawn Modern final stability layer.
+-- Preserves the complete 9.8-era feature set while fixing storage, profile/settings,
+-- stable scrolling/toggle animation, and rounded clipped containers.
+do
+local Window=assert(Fawn.Classes and Fawn.Classes.Window,"Fawn Window class missing")
+local SettingsPage=assert(Fawn.Classes and Fawn.Classes.SettingsPage,"Fawn SettingsPage class missing")
+local ROOT="Fawn Modern"
+local PATHS={Root=ROOT,Configs=ROOT.."/configs",ProfilePictures=ROOT.."/Profile Pictures",LogoPictures=ROOT.."/logo pictures"}
+local IMG_EXT={png=true,jpg=true,jpeg=true,bmp=true,webp=true}
+local CFG_EXT={lua=true,cfg=true,txt=true,json=true}
+local managedTextures={}
+
+local function fsFinal()return type(file)=="table"and file or nil end
+local function basenameFinal(p)p=tostring(p or""):gsub("\\","/"):gsub("/+$","");return p:match("([^/]+)$")or p end
+local function extFinal(p)return lower((tostring(p or""):match("%.([^%./\\]+)$")or""))end
+local function mkdirFinal(path)
+    local f=fsFinal();if not f then return false end
+    for _,n in ipairs({"mkdir","Mkdir","MakeDirectory","makeDirectory","CreateDirectory","createDirectory"})do
+        if type(f[n])=="function"then local ok,r=pcall(f[n],path);if ok and r~=false then return true end end
+    end
+    return false
+end
+local function ensureFinal()
+    mkdirFinal(ROOT);mkdirFinal(PATHS.Configs);mkdirFinal(PATHS.ProfilePictures);mkdirFinal(PATHS.LogoPictures)
+    return PATHS
+end
+local function normalizeFinal(raw)
+    local out,seen={},{}
+    local function add(v)
+        local s
+        if type(v)=="string"then s=v elseif type(v)=="table"then s=v.name or v.Name or v.path or v.Path or v.file or v.File end
+        if not s then return end
+        local n=basenameFinal(s);if n~=""and not seen[n]then seen[n]=true;out[#out+1]=n end
+    end
+    if type(raw)=="table"then for k,v in pairs(raw)do if type(k)=="string"and v==true then add(k)else add(v)end end
+    elseif type(raw)=="string"then for s in raw:gmatch("[^\r\n]+")do add(s)end end
+    sort(out,function(a,b)return lower(a)<lower(b)end)
+    return out
+end
+local function listFinal(kind)
+    ensureFinal();kind=tostring(kind or"Configs")
+    if kind=="Profiles"or kind=="Profile"then kind="ProfilePictures"elseif kind=="Logos"or kind=="Logo"then kind="LogoPictures"end
+    local path=PATHS[kind]or ROOT;local f=fsFinal();if not f then return{}end
+    local raw
+    for _,n in ipairs({"list","List","listdir","ListDir","ListDirectory","listFiles","ListFiles","listfiles","GetFiles","getFiles","getfiles"})do
+        if type(f[n])=="function"then local ok,r=pcall(f[n],path);if ok and(type(r)=="table"or type(r)=="string")then raw=r;break end end
+    end
+    local src=normalizeFinal(raw);local out={}
+    for _,n in ipairs(src)do local e=extFinal(n);if kind=="Configs"then if CFG_EXT[e]then out[#out+1]=n end elseif kind=="ProfilePictures"or kind=="LogoPictures"then if IMG_EXT[e]then out[#out+1]=n end else out[#out+1]=n end end
+    return out
+end
+local function resolveFinal(kind,name)
+    name=tostring(name or""):gsub("\\","/")
+    if name==""then return""end
+    if name:sub(1,#ROOT)==ROOT then return name end
+    local base=PATHS[kind]or ROOT
+    if name:find("/",1,true)then return name end
+    return base.."/"..name
+end
+local function configPathFinal(name)
+    name=tostring(name or"default.lua"):gsub("\\","/");if name==""then name="default.lua"end
+    if not name:find("%.[^/]+$")then name=name..".lua"end
+    if name:sub(1,#PATHS.Configs)==PATHS.Configs then return name end
+    if name:find("/",1,true)then return name end
+    return PATHS.Configs.."/"..name
+end
+local function loadManaged(path,force)
+    path=tostring(path or"")
+    if path==""then return nil end
+    if not force and managedTextures[path]~=nil then return managedTextures[path]or nil end
+    local f=fsFinal();if not f then managedTextures[path]=false;return nil end
+    local reader=f.read or f.Read;if type(reader)~="function"then managedTextures[path]=false;return nil end
+    local ok,data=pcall(reader,path);if not ok or type(data)~="string"or data==""then managedTextures[path]=false;return nil end
+    local loader=(utility and(utility.LoadImage or utility.loadImage))or(image and(image.load or image.Load))
+    if type(loader)~="function"then managedTextures[path]=false;return nil end
+    local ok2,id=pcall(loader,data);if ok2 and(type(id)=="number"or type(id)=="userdata")then managedTextures[path]=id;return id end
+    managedTextures[path]=false;return nil
+end
+
+Fawn.StoragePaths={Root=ROOT,Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}
+function Fawn:EnsureStorage()return ensureFinal()end
+function Fawn:GetStoragePaths()return{Root=ROOT,Configs=PATHS.Configs,ProfilePictures=PATHS.ProfilePictures,LogoPictures=PATHS.LogoPictures}end
+function Fawn:GetStorageDisplayPaths()
+    local q=self:GetStoragePaths();local f=fsFinal();local root=nil
+    if f and type(f.root)=="function"then local ok,r=pcall(f.root);if ok and type(r)=="string"and r~=""then root=r:gsub("\\","/"):gsub("/+$","")end end
+    if root then for k,v in pairs(q)do q[k]=root.."/"..v end end
+    return q
+end
+function Fawn:ListStorage(kind)return listFinal(kind)end
+function Fawn:ResolveStoragePath(kind,name)return resolveFinal(kind,name)end
+function Fawn:ClearImageCache(path)if path then managedTextures[tostring(path)]=nil else managedTextures={}end return self end
+function Fawn:PreloadStorageImages(force)
+    ensureFinal()
+    for _,kind in ipairs({"ProfilePictures","LogoPictures"})do for _,name in ipairs(listFinal(kind))do loadManaged(resolveFinal(kind,name),force==true)end end
+    return self
+end
+ensureFinal()
+Fawn:PreloadStorageImages(false)
+
+function Window:SetProfileImage(v)
+    if type(v)=="number"or type(v)=="userdata"then self.profileImage=v;self.profileImagePath=nil;return self end
+    local path=type(v)=="string"and resolveFinal("ProfilePictures",v)or""
+    self.profileImagePath=path~=""and path or nil;self.profileImage=path~=""and loadManaged(path,false)or nil;self._profileImageRetry=0
+    return self
+end
+function Window:ClearProfileImage()self.profileImage=nil;self.profileImagePath=nil;self._profileImageRetry=nil;return self end
+function Window:SetLogoImage(v)
+    if type(v)=="number"or type(v)=="userdata"then self.logoImage=v;self.logoImagePath=nil;return self end
+    local path=type(v)=="string"and resolveFinal("LogoPictures",v)or""
+    self.logoImagePath=path~=""and path or nil;self.logoImage=path~=""and loadManaged(path,false)or nil;self._logoImageRetry=0
+    return self
+end
+function Window:ClearLogoImage()self.logoImage=nil;self.logoImagePath=nil;self._logoImageRetry=nil;return self end
+
+-- If an image was copied into the managed folder after startup, retry a failed cached load
+-- without requiring a script reload.
+local renderImagesFinal=Window._render
+function Window:_render(...)
+    local n=nowMs()
+    if self.profileImagePath and not self.profileImage and n>=(self._profileImageRetry or 0)then managedTextures[self.profileImagePath]=nil;self.profileImage=loadManaged(self.profileImagePath,true);self._profileImageRetry=n+350 end
+    if self.logoImagePath and not self.logoImage and n>=(self._logoImageRetry or 0)then managedTextures[self.logoImagePath]=nil;self.logoImage=loadManaged(self.logoImagePath,true);self._logoImageRetry=n+350 end
+    return renderImagesFinal(self,...)
+end
+
+-- The profile popup is fully authorable but has no build/version action.
+local setProfileFinal=Window.SetProfileMenu
+function Window:SetProfileMenu(items,opt)
+    local out={}
+    for _,v in ipairs(type(items)=="table"and items or{})do
+        local isBuild=v=="build"or(type(v)=="table"and v.builtin=="build")
+        if not isBuild then out[#out+1]=v end
+    end
+    return setProfileFinal(self,out,opt)
+end
+local addBuiltinFinal=Window.AddProfileMenuBuiltin
+function Window:AddProfileMenuBuiltin(id,opt)if lower(tostring(id or""))=="build"then return nil end return addBuiltinFinal(self,id,opt)end
+
+-- Stable control identity keeps toggle interpolation from restarting every frame while a Section scrolls.
+local drawControlFinal=Window._drawControl
+function Window:_drawControl(c,r,clipTop,clipBottom)
+    local prev=self._activeControlAnimId
+    self._activeControlAnimId=c and c.id or prev
+    local a,b,d,e=drawControlFinal(self,c,r,clipTop,clipBottom)
+    self._activeControlAnimId=prev
+    return a,b,d,e
+end
+
+-- Rounded fixed/fill Sections: only vertically complete rows render when the row crosses
+-- a viewport edge. The old x-bound gate is intentionally gone because it rejected valid rows
+-- beside the reserved scrollbar gutter. The visible card slice itself is always rounded.
+function Window:_drawSection(box,bodyTop,bodyBottom,bodyLeft,bodyRight)
+    local sec=box.section;local s=self.scale;local cardTop=box.cardY;local cardBottom=cardTop+box.cardH
+    local clipL=max(bodyLeft or box.x,box.x);local clipR=min(bodyRight or(box.x+box.w),box.x+box.w);local clipT=max(bodyTop,cardTop);local clipB=min(bodyBottom,cardBottom)
+    if clipB<=clipT or clipR<=clipL then return end
+    if sec._scrollDrag then
+        if Input.left and sec.maxScroll>0 then local rr=snapRatio96((Input.my-sec._scrollDrag.top-sec._scrollDrag.off)/max(1,sec._scrollDrag.span));sec.scrollTarget=rr*sec.maxScroll;sec.scroll=sec.scrollTarget
+        else sec._scrollDrag=nil;sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)end
+    else sec.scroll,sec.scrollTarget=settle96(sec.scroll,sec.scrollTarget,sec.maxScroll,self.scrollSpeed,s,false)end
+    local offset=sec.scroll or 0;offset=round(offset)
+    local rr=min(14*s,(clipB-clipT)*.5,(clipR-clipL)*.5)
+    self:_fill("card",clipL,clipT,clipR-clipL,clipB-clipT,"card",rr)
+    local rows={}for c,r in pairs(box.layouts or{})do rows[#rows+1]={c=c,r=r}end
+    sort(rows,function(a,b)if a.r.y==b.r.y then return a.r.x<b.r.x end return a.r.y<b.r.y end)
+    local eps=max(.65,s*.55)
+    for _,q in ipairs(rows)do
+        local r={x=q.r.x,y=round(q.r.y-offset),w=q.r.w,h=q.r.h}
+        if r.y>=clipT-eps and r.y+r.h<=clipB+eps then self:_drawControl(q.c,r,clipT,clipB)end
+    end
+    if sec.columnDividers==true and sec.columns and sec.columns>1 then
+        local gap=(sec.controlGap or 12)*s;local usable=box.w-(((sec.sizeMode=="fixed"or sec.sizeMode=="fill"or sec.maxHeight)and REF.SectionScrollbarGutter or 0)*s);local cw=(usable-gap*(sec.columns-1))/sec.columns
+        for i=1,sec.columns-1 do local x=box.x+i*cw+(i-.5)*gap;local y1=max(clipT+rr,cardTop+rr);local y2=min(clipB-rr,cardBottom-rr);if y2>y1 then line(x,y1,x,y2,self:_color("line"),1,14)end end
+    end
+    if sec.maxScroll>1 then
+        local gutter=REF.SectionScrollbarGutter*s;local gx=box.x+box.w-gutter;local tx=gx+gutter*.5;local top=clipT+max(9*s,rr*.72);local bh=max(1,clipB-top-max(9*s,rr*.72));local thumb=max(28*s,bh*(box.cardH/max(box.cardH,box.contentH)));local span=max(1,bh-thumb);local ratio=sec.maxScroll>0 and snapRatio96((sec.scroll or 0)/sec.maxScroll)or 0;local ty=top+span*ratio;local thumbHover=self:_hit(gx,ty-3*s,gutter,thumb+6*s);local trackHover=self:_hit(gx,clipT,gutter,clipB-clipT);local active=sec._scrollDrag~=nil
+        if trackHover or active then rect(tx-1*s,top,2*s,bh,self:_color("controlHover"),1*s,88)end
+        rect(tx-((active or thumbHover)and 2*s or 1.5*s),ty,(active or thumbHover)and 4*s or 3*s,thumb,self:_color((active or thumbHover)and"accent"or"outline"),2*s,(active or thumbHover)and 255 or 180)
+        if Input.click and not self._consumed and not self:_hasPopup()and thumbHover then sec._scrollDrag={top=top,span=span,off=Input.my-ty};self:_consume()end
+    else sec._scrollDrag=nil;sec.scroll,sec.scrollTarget=0,0 end
+    self:_out(clipL,clipT,clipR-clipL,clipB-clipT,rr,.82,self:_color("outline"),112)
+    local titleY=box.y+7*s;if titleY>=bodyTop-20*s and titleY<=bodyBottom then textC(fit(upper(sec.name),max(20,box.w-44*s),14*s,"Verdana"),box.x+22*s,titleY,self:_color("muted"),14*s,"Verdana")end
+end
+
+-- Complete built-in Settings page. It is reusable on any Window/Panel and can be hidden
+-- from the sidebar while remaining reachable from the profile popup.
+function Fawn:CreateSettingsPage(window,opt)
+    if window==self then window,opt=opt,nil end
+    if kind(window)~="Window"and kind(window)~="Panel"then error("CreateSettingsPage requires a Fawn Window")end
+    if window.settingsPage then return window.settingsPage end
+    ensureFinal();self:PreloadStorageImages(false);opt=type(opt)=="table"and opt or{}
+    local page=setmetatable({Window=window,Controls={},ConfigPath=configPathFinal(opt.configPath or"default.lua"),Defaults=nil},SettingsPage)
+    local tab=window:Tab(opt.title or"Settings",{group=opt.group or"MISCELLANEOUS",icon="settings"});page.Tab=tab;tab.sidebarHidden=opt.showInSidebar==false or opt.profileOnly==true
+    local appearance=tab:Section("APPEARANCE",{column=1,row=1,sizeMode="auto"})
+    local behavior=tab:Section("BEHAVIOR",{column=2,row=1,sizeMode="auto"})
+    local profile=tab:Section("PROFILE & BRAND",{column=1,row=2,sizeMode="auto"})
+    local config=tab:Section("CONFIGURATION",{column=2,row=2,sizeMode="auto"})
+    local diagnostics=tab:Section("DIAGNOSTICS",{column=1,row=3,span=2,columns=2,sizeMode="auto"})
+    local ti=indexOf(Fawn.ThemeNames,window:GetThemeName())or 1
+    page.Controls.Theme=appearance:Dropdown("Theme",Fawn.ThemeNames,ti,{noConfig=true});page.Controls.Theme:OnChanged(function(v)window:SetTheme(v);if page._syncColors then page:_syncColors()end end)
+    page.Controls.Scale=appearance:Slider("UI Scale",55,165,round(window:GetScale()*100),{noConfig=true,format=function(v)return round(v).."%"end});page.Controls.Scale:OnChanged(function(v)window:SetScale(v/100)end)
+    appearance:AddSeparator("MATERIAL")
+    local mats=Fawn.SurfaceStyles or{"Solid","Frosted","Acrylic","Smoke","Clear"};page.Controls.SurfaceStyle=appearance:Dropdown("Surface Material",mats,indexOf(mats,window.GetSurfaceStyle and window:GetSurfaceStyle()or"Solid")or 1,{noConfig=true});page.Controls.SurfaceStyle:OnChanged(function(v)if window.SetSurfaceStyle then window:SetSurfaceStyle(v)end;if page.Controls.Glass then page.Controls.Glass:Set(window:GetLiquidGlass(),true)end end)
+    page.Controls.Glass=appearance:Toggle("Liquid Glass",window:GetLiquidGlass(),{noConfig=true});page.Controls.Glass:OnChanged(function(v)window:SetLiquidGlass(v);if page.Controls.SurfaceStyle and window.GetSurfaceStyle then page.Controls.SurfaceStyle:Set(window:GetSurfaceStyle(),true)end end)
+    page.Controls.GlassOpacity=appearance:Slider("Glass Opacity",18,100,round(window:GetGlassOpacity()*100),{noConfig=true,format=function(v)return round(v).."%"end});page.Controls.GlassOpacity:OnChanged(function(v)window:SetGlassOpacity(v/100)end)
+    if window.GetGlassTint then page.Controls.GlassTint=appearance:ColorPicker("Glass Tint",window:GetGlassTint(),{noConfig=true});page.Controls.GlassTint:OnChanged(function(v)window:SetGlassTint(v)end)end
+    if window.GetGlassTintStrength then page.Controls.GlassTintStrength=appearance:Slider("Tint Strength",0,65,round(window:GetGlassTintStrength()*100),{noConfig=true,format=function(v)return round(v).."%"end});page.Controls.GlassTintStrength:OnChanged(function(v)window:SetGlassTintStrength(v/100)end)end
+    if window.SetSurfaceHighlights then page.Controls.SurfaceHighlights=appearance:Toggle("Glass Highlights",window.surfaceHighlights~=false,{noConfig=true});page.Controls.SurfaceHighlights:OnChanged(function(v)window:SetSurfaceHighlights(v)end)end
+    appearance:AddSeparator("GEOMETRY & OUTLINE")
+    local corners=Fawn.CornerPresets or{"Square","Tight","Soft","Round"};page.Controls.CornerPreset=appearance:Dropdown("Corner Preset",corners,indexOf(corners,"Round")or 1,{noConfig=true});page.Controls.CornerPreset:OnChanged(function(v)if window.SetCornerPreset then window:SetCornerPreset(v)end end)
+    if window.SetRadiusScale then page.Controls.RadiusScale=appearance:Slider("Radius Scale",45,165,round((window.radiusScale or 1)*100),{noConfig=true,format=function(v)return round(v).."%"end});page.Controls.RadiusScale:OnChanged(function(v)window:SetRadiusScale(v/100)end)end
+    page.Controls.Outline=appearance:ColorPicker("Outline",window:GetOutlineColor(),{noConfig=true});page.Controls.Outline:OnChanged(function(v)window:SetOutlineColor(v);window:SetThemeColor("outline",v,true)end)
+    page.Controls.OutlineStrength=appearance:Slider("Outline Thickness",25,300,round(window:GetOutlineStrength()*100),{noConfig=true,format=function(v)return format("%.2fx",v/100)end});page.Controls.OutlineStrength:OnChanged(function(v)window:SetOutlineStrength(v/100)end)
+    if window.SetOutlineOpacity then page.Controls.OutlineOpacity=appearance:Slider("Outline Opacity",15,100,round((window.outlineOpacity or 1)*100),{noConfig=true,format=function(v)return round(v).."%"end});page.Controls.OutlineOpacity:OnChanged(function(v)window:SetOutlineOpacity(v/100)end)end
+    appearance:AddSeparator("COLORS")
+    local colorDefs={{"Accent","accent"},{"Main Background","menuBg"},{"Card Background","card"},{"Control Background","control"},{"Control Hover","controlHover"},{"Active Item","activeItem"},{"Text","text"},{"Muted Text","muted"},{"Navigation Text","navText"},{"Popup","popup"},{"Icon","icon"},{"Chevron","chev"},{"Toggle Track","toggleTrack"},{"Toggle Knob","toggleKnob"},{"Logo Background","logoBg"},{"Logo Foreground","logoFg"},{"Avatar","avatar"},{"Avatar Dark","avatarDark"},{"Separator Line","line"}}
+    page.ColorControls={}
+    for _,d in ipairs(colorDefs)do local cp=appearance:ColorPicker(d[1],window:_color(d[2]),{noConfig=true});cp:OnChanged(function(v)window:SetThemeColor(d[2],v,true)end);page.ColorControls[d[2]]=cp end
+    function page:_syncColors()for k,c in pairs(self.ColorControls or{})do c:Set(window:_color(k),true)end;if self.Controls.Outline then self.Controls.Outline:Set(window:GetOutlineColor(),true)end end
+    appearance:AddButton("Reset Appearance",function()window:SetTheme("Modern Blue"):SetScale(1):SetLiquidGlass(false):SetOutlineStrength(1);if window.ResetPolish then window:ResetPolish()end;page:_syncColors()end)
+
+    page.Controls.Smooth=behavior:Toggle("Smooth Scrolling",window.smoothScroll,{noConfig=true});page.Controls.Smooth:OnChanged(function(v)window:SetSmoothScroll(v)end)
+    page.Controls.Anim=behavior:Toggle("Animations",window.animations,{noConfig=true});page.Controls.Anim:OnChanged(function(v)window:SetAnimations(v)end)
+    if window.SetMotionStyle then local motions=Fawn.MotionStyles or{"Off","Minimal","Smooth","Snappy","Fluid"};page.Controls.MotionStyle=behavior:Dropdown("Animation Style",motions,indexOf(motions,window.motionStyle or"Smooth")or 1,{noConfig=true});page.Controls.MotionStyle:OnChanged(function(v)window:SetMotionStyle(v)end)end
+    page.Controls.MotionSpeed=behavior:Slider("Animation Speed",4,30,round(window.animationSpeed or 10),{noConfig=true});page.Controls.MotionSpeed:OnChanged(function(v)window:SetAnimationSpeed(v)end)
+    if window.SetHoverAnimations then page.Controls.HoverAnimations=behavior:Toggle("Animated Hovers",window.hoverAnimations~=false,{noConfig=true});page.Controls.HoverAnimations:OnChanged(function(v)window:SetHoverAnimations(v)end)end
+    if window.SetSwitchAnimations then page.Controls.SwitchAnimations=behavior:Toggle("Animated Switches",window.switchAnimations~=false,{noConfig=true});page.Controls.SwitchAnimations:OnChanged(function(v)window:SetSwitchAnimations(v)end)end
+    page.Controls.ScrollSpeed=behavior:Slider("Scroll Speed",1,30,window:GetScrollSpeed(),{noConfig=true});page.Controls.ScrollSpeed:OnChanged(function(v)window:SetScrollSpeed(v)end)
+    local np=indexOf(Fawn.NotificationPositions,window:GetNotificationPosition())or 4;page.Controls.Notifications=behavior:Dropdown("Notification Corner",Fawn.NotificationPositions,np,{noConfig=true});page.Controls.Notifications:OnChanged(function(v)window:SetNotificationPosition(v)end)
+    page.Controls.MenuKey=behavior:Keybind("Menu Key",window.toggleKey,{label=window.toggleLabel,mode="Toggle",keyboardOnly=true,keybindList=false,noConfig=true});page.Controls.MenuKey:OnKeyChanged(function(k,l)window:SetToggleKey(k,l)end)
+    behavior:AddButtonPair("Center UI",function()window:Center()end,"Default Size",function()window:SetSize(REF.Width,REF.Height)end)
+
+    page.Controls.ProfileName=profile:Input("Username",window.profileName,{placeholder="User",noConfig=true});page.Controls.ProfileName:OnChanged(function(v)window:SetProfileName(v)end)
+    page.Controls.ProfileSub=profile:Input("Subtitle",window.profileSubtitle,{placeholder="Developer",noConfig=true});page.Controls.ProfileSub:OnChanged(function(v)window:SetProfileSubtitle(v)end)
+    profile:AddSeparator("PROFILE PICTURE")
+    local function imageOpts(kind,empty)local q=listFinal(kind);if #q==0 then return{empty}end return q end
+    page.Controls.ProfileBrowser=profile:Dropdown("Profile Picture",imageOpts("ProfilePictures","(no profile pictures)"),1,{noConfig=true});page.Controls.ProfileBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then window:SetProfileImage(v)end end)
+    profile:AddButtonPair("Refresh Pictures",function()Fawn:ClearImageCache();Fawn:PreloadStorageImages(true);page:RefreshBrowsers()end,"Clear Avatar",function()window:ClearProfileImage()end)
+    profile:AddSeparator("BRAND & LOGO")
+    page.Controls.Brand=profile:Input("Brand Title",window.brand,{noConfig=true});page.Controls.Brand:OnChanged(function(v)window.brand=v end)
+    page.Controls.Subtitle=profile:Input("Brand Subtitle",window.subtitle,{noConfig=true});page.Controls.Subtitle:OnChanged(function(v)window.subtitle=v end)
+    page.Controls.LogoBrowser=profile:Dropdown("Logo Picture",imageOpts("LogoPictures","(no logo pictures)"),1,{noConfig=true});page.Controls.LogoBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then window:SetLogoImage(v)end end)
+    profile:AddButtonPair("Refresh Logos",function()Fawn:ClearImageCache();Fawn:PreloadStorageImages(true);page:RefreshBrowsers()end,"Clear Logo",function()window:ClearLogoImage()end)
+
+    local cfgs=listFinal("Configs");if #cfgs==0 then cfgs={"(no config files)"}end
+    page.Controls.ConfigBrowser=config:Dropdown("Config File",cfgs,1,{noConfig=true});page.Controls.ConfigBrowser:OnChanged(function(v)if v and v:sub(1,1)~="("then page:SetConfigPath(v)end end)
+    page.Controls.ConfigName=config:Input("New Config Name","default.lua",{placeholder="default.lua",noConfig=true,maxLength=96})
+    config:AddButtonPair("Save As",function()page:SetConfigPath(page.Controls.ConfigName:Get());page:SaveConfig();page:RefreshBrowsers()end,"Load Selected",function()local v=page.Controls.ConfigBrowser:Get();if v and v:sub(1,1)~="("then page:SetConfigPath(v);page:LoadConfig()end end)
+    config:AddButtonPair("Refresh Files",function()page:RefreshBrowsers()end,"Show Path",function()page:ShowConfigPath()end)
+    config:AddSeparator("IN-MEMORY PROFILES")
+    config:AddButtonPair("Save Current",function()window:SaveNamedConfig(window.configName);window:Notify("Named config saved",{title="CONFIG"})end,"Duplicate",function()local n=window:DuplicateNamedConfig();window:Notify("Created "..n,{title="CONFIG"})end)
+    config:AddValue("Configs Folder",PATHS.Configs,{muted=true,wrap=true,maxLines=2})
+
+    diagnostics:AddValue("Paint Frames",function()return Fawn:GetPaintCount()end,{controlColumn=1});diagnostics:AddValue("Paint Errors",function()return Fawn:GetPaintErrors()end,{controlColumn=1})
+    diagnostics:AddValue("Draw Errors",function()return E.drawErrors end,{controlColumn=2});diagnostics:AddValue("Window Size",function()local w,h=window:GetSize();return round(w).." x "..round(h)end,{controlColumn=2});diagnostics:AddValue("Scale",function()return round(window:GetScale()*100).."%"end,{controlColumn=2})
+    diagnostics:AddButton("Test Notification",function()window:Notify("Fawn Modern settings and secondary UI test.",{title="DIAGNOSTICS"})end,{controlColumn=2})
+
+    function page:RefreshBrowsers()
+        Fawn:PreloadStorageImages(false)
+        local function apply(ctrl,list,empty)local q=list;if #q==0 then q={empty}end;if ctrl then ctrl:SetOptions(q,{preserve="text"})end end
+        apply(self.Controls.ConfigBrowser,listFinal("Configs"),"(no config files)")
+        apply(self.Controls.ProfileBrowser,listFinal("ProfilePictures"),"(no profile pictures)")
+        apply(self.Controls.LogoBrowser,listFinal("LogoPictures"),"(no logo pictures)")
+        return self
+    end
+    page:CaptureDefaults();window.settingsPage=page;page:RefreshBrowsers();return page
+end
+
+function Fawn:CreatePresetSettingsMenu(window,opt)
+    if window==self then window,opt=opt,nil end
+    opt=type(opt)=="table"and copy(opt)or{};opt.showInSidebar=opt.showInSidebar==true;opt.profileOnly=opt.showInSidebar~=true;opt.title=opt.title or"Settings";opt.group=opt.group or"MISCELLANEOUS";opt.configPath=opt.configPath or"default.lua"
+    local page=self:CreateSettingsPage(window,opt);if page and page.Tab and opt.showInSidebar~=true then page.Tab.sidebarHidden=true end
+    if opt.profileEntry~=false and window then local item={builtin="settings",label=opt.profileLabel or"Settings",icon=opt.profileIcon or"settings"};if opt.profileMenuOnly==true then window:SetProfileMenu({item},{title=opt.profileMenuTitle or"PROFILE",width=opt.profileMenuWidth or 261})else window:AddProfileMenuBuiltin("settings",item)end end
+    if window then window.presetSettingsPage=page end
+    return page
+end
+function Window:AddPresetSettingsMenu(opt)return Fawn:CreatePresetSettingsMenu(self,opt)end
+Window.CreatePresetSettingsMenu=Window.AddPresetSettingsMenu
+function Window:GetPresetSettingsMenu()return self.presetSettingsPage or self.settingsPage end
+function Window:OpenPresetSettings()local p=self:GetPresetSettingsMenu()or self:AddPresetSettingsMenu({profileEntry=false});if p and p.Tab then self:SelectTab(p.Tab)end;self.accountOpen=false;return p end
+function Window:AttachSettingsToProfile(opt)
+    opt=type(opt)=="table"and opt or{};local p=self:GetPresetSettingsMenu()or self:AddPresetSettingsMenu({profileEntry=false,configPath=opt.configPath})
+    local item={builtin="settings",label=opt.label or"Settings",icon=opt.icon or"settings"};if opt.only~=false then self:SetProfileMenu({item},{title=opt.title or"PROFILE",width=opt.width or 261})else self:AddProfileMenuBuiltin("settings",item)end
+    return p
+end
+
+-- New windows no longer expose a build/version row by default. Scripts can still fully author this menu.
+local createWindowFinal=Fawn.CreateWindow
+function Fawn:CreateWindow(opt)
+    local w=createWindowFinal(self,opt)
+    if w and w.profileMenuExact==nil then w:SetProfileMenu({"settings","profile","center","close"},{title="PROFILE"})end
+    return w
+end
+
+-- No numeric build/version system is exposed.
+Fawn.DisplayName="Fawn Modern";Fawn.ProductName="Fawn Modern";Fawn.Namespace="FawnModern"
+function Fawn:AssertCompatible()return true end
+Fawn.DynamicCapabilities=Fawn.DynamicCapabilities or{}
+Fawn.DynamicCapabilities.ManagedStorage=true;Fawn.DynamicCapabilities.PresetSettingsMenu=true;Fawn.DynamicCapabilities.ProfileMenuAuthoring=true;Fawn.DynamicCapabilities.StableSectionClipping=true;Fawn.DynamicCapabilities.StableToggleAnimation=true
+Fawn.Runtime=Fawn.Runtime or{}
+Fawn.Runtime.StorageRoot=ROOT;Fawn.Runtime.StoragePaths=Fawn:GetStoragePaths();Fawn.Runtime.PresetSettings="profile-popup or sidebar-mounted reusable Settings";Fawn.Runtime.SectionScrolling="pixel-snapped vertical full-row clipping + rounded visible slice";Fawn.Runtime.ToggleAnimation="stable control identity while scrolling"
+end
 
 return Fawn
